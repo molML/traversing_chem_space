@@ -1,51 +1,17 @@
 
 from torch_geometric.data import Data
-from rdkit.Chem import rdPartialCharges
-from typing import Union
-import numpy as np
-import sys
-import torch
 from rdkit import Chem
 from tqdm import tqdm
-
-
-import os.path
-from torch_geometric.loader import DataLoader
-from sklearn.model_selection import StratifiedKFold
 import numpy as np
-import pandas as pd
 import torch
-
-
-def bulk_featurizer(smiles: Union[list, str], y: Union[list, float] = None, return_failed: bool = False,
-                          silent: bool = False, hide_progress_bar: bool = True):
-    if type(smiles) is str:
-        smiles = list(str)
-        y = list(y)
-
-    graphs, failed_smiles = [], []
-    for smi, y_val in tqdm(zip(smiles, y), disable=hide_progress_bar):
-        G = molecular_graph_featurizer(smi, y=torch.tensor([y_val]).float())
-        if type(G) is str:
-            failed_smiles.append(G)
-        else:
-            graphs.append(G)
-
-    if not silent and len(failed_smiles) > 0:
-        print(f"Failed featurizing {len(failed_smiles)}/{len(smiles)} molecules: {failed_smiles}", flush=True,
-              file=sys.stderr)
-
-    if return_failed:
-        return graphs, failed_smiles
-
-    return graphs
 
 
 def molecular_graph_featurizer(smiles: str, y=None):
 
     y = torch.tensor([y]).float()
 
-    mol = Chem.MolFromSmiles(smiles)
+    mol = Chem.MolFromSmiles(smiles, sanitize=True)
+    Chem.AssignStereochemistry(mol, cleanIt=True, force=True)
 
     # RDKIT Atom featurization
     xs = []
@@ -53,6 +19,7 @@ def molecular_graph_featurizer(smiles: str, y=None):
         try:
             x = atom_props(atom)
         except:
+            # pass
             return smiles
         xs.append(x)
     x = torch.tensor(xs)
@@ -128,69 +95,24 @@ def atom_props(atom):
     hybridization[possible_hybridizations.index(atom.GetHybridization().name)] = 1
     x += hybridization
 
-    partial_charge = [sigmoid(float(atom.GetProp('_GasteigerCharge')))]
-    x.append(partial_charge)
-
-    atomic_weight = sigmoid(Chem.GetPeriodicTable().GetAtomicWeight(atom.GetSymbol()))
-    x.append(atomic_weight)
-
     return x
 
 
-def sigmoid(x: float):
-    return 1.0 / (1.0 + float(np.exp(-x)))
-
-
-def molecule_from_smiles(smiles: str):
-    """ Sanitize a molecule from a SMILES string"""
-
-    molecule = Chem.MolFromSmiles(smiles, sanitize=False)
-
-    # If sanitization is unsuccessful, catch the error, and try again without
-    # the sanitization step that caused the error
-    flag = Chem.SanitizeMol(molecule, catchErrors=True)
-    if flag != Chem.SanitizeFlags.SANITIZE_NONE:
-        Chem.SanitizeMol(molecule, sanitizeOps=Chem.SanitizeFlags.SANITIZE_ALL ^ flag)
-
-    Chem.AssignStereochemistry(molecule, cleanIt=True, force=True)
-    Chem.rdPartialCharges.ComputeGasteigerCharges(molecule)
-
-    return molecule
-
-# dataset_path = 'data/screen.csv'
-# def load_data(dataset_path, batch_size: int = 32, shuffle: bool = False):
+# def molecule_from_smiles(smiles: str):
+#     """ Sanitize a molecule from a SMILES string"""
 #
-#     pickled = dataset_path.replace('.csv', '.pt')
-#     if os.path.exists(pickled):
-#         data = torch.load(pickled)
-#     else:
-#         df = pd.read_csv(dataset_path)
-#         graphs = bulk_featurizer(df.smiles.tolist(), df.y.tolist(), hide_progress_bar=False)
+#     molecule = Chem.MolFromSmiles(smiles, sanitize=True)
+#     Chem.AssignStereochemistry(molecule, cleanIt=True, force=True)
 #
-#         data = DataLoader(graphs, batch_size=batch_size, shuffle=shuffle)
-#         torch.save(data, pickled)
+#     # If sanitization is unsuccessful, catch the error, and try again without
+#     # the sanitization step that caused the error
+#     flag = Chem.SanitizeMol(molecule, catchErrors=True)
+#     if flag != Chem.SanitizeFlags.SANITIZE_NONE:
+#         Chem.SanitizeMol(molecule, sanitizeOps=Chem.SanitizeFlags.SANITIZE_ALL ^ flag)
 #
-#     return data
-
-# indices_path = 'data/split_indices.pt'
-def load_data(indices_path: str = 'data/split_indices.pt', data_path: str = 'data/molecular_graphs.pt',
-              batch_size: int = 32, type: str = 'graph'):
-    split_indices = torch.load(indices_path)
-
-    if type == 'graph':
-        data = torch.load(data_path)
-
-        screen = DataLoader([data[idx] for idx in split_indices['screen']], batch_size=batch_size, shuffle=False)
-        train = DataLoader([data[idx] for idx in split_indices['train']], batch_size=batch_size, shuffle=True)
-        test = DataLoader([data[idx] for idx in split_indices['test']], batch_size=batch_size, shuffle=False)
-        val = DataLoader([data[idx] for idx in split_indices['val']], batch_size=batch_size, shuffle=False)
-
-        return screen, train, test, val
-
-    if type == 'ECFP':
-        data = pd.read_csv('data/all.csv')
-
-        [data[idx] for idx in split_indices['test']]
+#     # Chem.rdPartialCharges.ComputeGasteigerCharges(molecule)
+#
+#     return molecule
 
 
 def smiles_to_ecfp(smiles: list[str], radius: int = 2, nbits: int = 1024, silent: bool = True) -> np.ndarray:
