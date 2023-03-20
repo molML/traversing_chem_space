@@ -56,9 +56,9 @@ def split_data(df: pd.DataFrame, random_state: int = 42, screen_size: float = 0.
     return df_screen, df_test
 
 
-class dataset:
+class MasterDataset:
     """ Dataset that holds all data in an indexable way """
-    def __init__(self, df: pd.DataFrame, name: str, representation: str = 'ecfp', root: str = 'data') -> None:
+    def __init__(self, name: str, df: pd.DataFrame = None, representation: str = 'ecfp', root: str = 'data') -> None:
 
         assert representation in ['ecfp', 'graph'], f"'representation' must be 'ecfp' or 'graph', not {representation}"
         self.representation = representation
@@ -66,6 +66,7 @@ class dataset:
 
         # If not done already, process all data. Else just load it
         if not os.path.exists(self.pth):
+            assert df is not None, "You need to supply a dataframe with 'smiles' and 'y' values"
             os.makedirs(os.path.join(root, name))
             self.process(df)
             self.smiles_index, self.index_smiles, self.smiles, self.x, self.y, self.graphs = self.load()
@@ -106,13 +107,16 @@ class dataset:
     def __len__(self) -> int:
         return len(self.smiles)
 
+    def all(self):
+        return self[range(len(self.smiles))]
+
     def __getitem__(self, idx):
         if type(idx) is int:
             idx = [idx]
         if self.representation == 'ecfp':
-            return self.x[idx], self.y[idx]
+            return self.x[idx], self.y[idx], self.smiles[idx]
         if self.representation == 'graph':
-            return [self.graphs[i] for i in idx], self.y[idx]
+            return [self.graphs[i] for i in idx], self.y[idx], self.smiles[idx]
 
 
 if __name__ == '__main__':
@@ -120,5 +124,5 @@ if __name__ == '__main__':
     df = get_data()
     df_screen, df_test = split_data(df, screen_size=0.9)
 
-    dataset(df_screen, 'screen')
-    dataset(df_test, 'test', 'graph')
+    MasterDataset(df_screen, 'screen')
+    MasterDataset(df_test, 'test')
