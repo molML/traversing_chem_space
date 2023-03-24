@@ -52,6 +52,3 @@ class Handler:
 
     def __call__(self, *args, **kwargs):
         return self.get_idx()
-
-
-
