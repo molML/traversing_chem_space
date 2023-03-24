@@ -100,7 +100,8 @@ def atom_props(atom):
     return x
 
 
-def smiles_to_ecfp(smiles: list[str], radius: int = 2, nbits: int = 1024, silent: bool = True) -> np.ndarray:
+def smiles_to_ecfp(smiles: list[str], radius: int = 2, nbits: int = 1024, silent: bool = True, to_array: bool = True) \
+        -> np.ndarray:
     """ Get a Numpy array of ECFPs from a list of SMILES strings """
     from rdkit.Chem.AllChem import GetMorganFingerprintAsBitVect
     from rdkit.Chem import MolFromSmiles
@@ -110,6 +111,9 @@ def smiles_to_ecfp(smiles: list[str], radius: int = 2, nbits: int = 1024, silent
         smiles = [smiles]
 
     fp = [GetMorganFingerprintAsBitVect(MolFromSmiles(s), radius, nBits=nbits) for s in tqdm(smiles, disable=silent)]
+
+    if not to_array:
+        return fp
 
     output = []
     for f in fp:
@@ -122,12 +126,12 @@ def smiles_to_ecfp(smiles: list[str], radius: int = 2, nbits: int = 1024, silent
 
 class Evaluate:
     def __init__(self):
-        self.binary_accuracy = []
-        self.balanced_accuracy = []
-        self.roc_auc = []
-        self.precision = []
-        self.tpr = []
-        self.tn, self.fp, self.fn, self.tp = [], [], [], []
+        self.binary_accuracy = [0]
+        self.balanced_accuracy = [0]
+        self.roc_auc = [0]
+        self.precision = [0]
+        self.tpr = [0]
+        self.tn, self.fp, self.fn, self.tp = [0], [0], [0], [0]
 
     def eval(self, y_hat: torch.Tensor, y: torch.Tensor, threshold: float = 0.5):
 
@@ -145,13 +149,22 @@ class Evaluate:
         self.balanced_accuracy.append(balanced_acc)
 
         # calc_roc_auc
-        self.roc_auc.append(roc_auc_score(y, y_hat))
+        try:
+            self.roc_auc.append(roc_auc_score(y, y_hat))
+        except:
+            self.roc_auc.append(0)
 
         # calc_precision
-        self.precision.append(precision_score(y, y_hat_bin))
+        try:
+            self.precision.append(precision_score(y, y_hat_bin, zero_division=0))
+        except:
+            self.precision.append(0)
 
         # calc recall
-        self.tpr.append(recall_score(y, y_hat_bin))
+        try:
+            self.tpr.append(recall_score(y, y_hat_bin))
+        except:
+            self.tpr.append(0)
 
         # calc confusion
         tn, fp, fn, tp = confusion_matrix(y, y_hat_bin).ravel()
@@ -172,9 +185,10 @@ class Evaluate:
                f"True negatives:     {self.tn[-1]}\n"
 
     def to_dataframe(self, colnames: str = ''):
-        df = pd.DataFrame({'binary_accuracy': self.binary_accuracy, 'balanced_accuracy': self.balanced_accuracy,
-                           'precision': self.precision, 'tpr': self.tpr, 'roc_auc': self.roc_auc,
-                           'tp': self.tp, 'fn': self.fn, 'fp': self.fp, 'tn': self.tn})
+        df = pd.DataFrame({'cycle': list(range(len(self.tp))), 'binary_accuracy': self.binary_accuracy,
+                           'balanced_accuracy': self.balanced_accuracy, 'precision': self.precision, 'tpr': self.tpr,
+                           'roc_auc': self.roc_auc, 'tp': self.tp, 'fn': self.fn, 'fp': self.fp, 'tn': self.tn})
         df.columns = [f"{colnames}{i}" for i in df.columns]
 
         return df
+
