@@ -12,28 +12,29 @@ Derek van Tilborg | 06-03-2023 | Eindhoven University of Technology
 """
 
 import numpy as np
+import os
 import torch
 from typing import Union
 from skopt import gp_minimize
 from skopt.space.space import Categorical, Real, Integer
 from skopt.utils import use_named_args
 from sklearn.metrics import balanced_accuracy_score
-from active_learning.hyperparameters import BNN_hypers, GCN_hypers, BGCN_hypers
+from active_learning.hyperparameters import MLP_hypers, GCN_hypers
+from active_learning.utils import Evaluate, to_torch_dataloader
+from active_learning.acquisition import Acquisition, logits_to_pred
+from config import ROOT_DIR
 
 
-def optimize_hyperparameters(x: np.ndarray, y: np.ndarray, log_file: str, n_calls: int = 50, min_init_points: int = 10,
-                             n_folds: int = 5, architecture="gcn") -> dict:
+def optimize_hyperparameters(x: np.ndarray, y: np.ndarray, n_calls: int = 50, min_init_points: int = 10,
+                             n_folds: int = 5, architecture="gcn", log_file: str = 'hyper_opt.csv') -> dict:
     """ Wrapper function to optimize hyperparameters on a dataset using bootstrapped k-fold cross-validation """
 
-    assert architecture in ['bnn', 'gcn', 'bgcn'], f"'architecture' must be 'bnn', 'gcn', 'bgcn'"
+    assert architecture in ['mlp', 'gcn'], f"'architecture' must be 'mlp' or 'gcn'"
 
     if architecture == 'gcn':
         hypers = GCN_hypers
-    if architecture == 'bgcn':
-        hypers = BGCN_hypers
-        raise NotImplementedError
-    if architecture == 'bnn':
-        hypers = BNN_hypers
+    if architecture == 'mlp':
+        hypers = MLP_hypers
 
     # Optimize hyperparameters
     opt = BayesianOptimization()
@@ -62,7 +63,7 @@ class BayesianOptimization:
         dimensions = dict_to_search_space(dimensions)
 
         # touch hypers log file
-        with open(log_file, 'w') as f:
+        with open(os.path.join(ROOT_DIR, log_file), 'w') as f:
             f.write(f"score,hypers\n")
 
         # Objective function for Bayesian optimization
@@ -81,7 +82,7 @@ class BayesianOptimization:
                     score = k_fold_cross_validation(x, y, n_folds=n_folds, architecture=architecture, **hyperparameters)
                     score = 1 - score
 
-                    with open(log_file, 'a') as f:
+                    with open(os.path.join(ROOT_DIR, log_file), 'a') as f:
                         f.write(f"{score},{hyperparameters}\n")
 
                 # If this combination of hyperparameters fails, we use a dummy score that is worse than the best
@@ -148,10 +149,8 @@ def get_best_hyperparameters(filename: str) -> dict:
     return eval(hypers_str)
 
 
-def k_fold_cross_validation(x: np.ndarray, y: np.ndarray, n_folds: int = 5, seed: int = 42, architecture: str = 'bnn',
-                            **kwargs) -> float:
-    from active_learning.nn.models import BayesianNN, GCN
-    assert len(x) == len(y), f"x and y should contain the same number of samples x:{len(x)}, y:{len(y)}"
+def k_fold_cross_validation(x, y, n_folds: int = 5, seed: int = 42, architecture: str = 'mlp', **kwargs) -> float:
+    from active_learning.nn import Ensemble
 
     # Define some variables
     # Set random state and create folds
@@ -160,6 +159,7 @@ def k_fold_cross_validation(x: np.ndarray, y: np.ndarray, n_folds: int = 5, seed
     scores = []
 
     for i in range(n_folds):
+        # break
         # Subset train/test folds
         if type(x) is np.ndarray:
             x_train, y_train = x[folds != i], y[folds != i]
@@ -168,18 +168,15 @@ def k_fold_cross_validation(x: np.ndarray, y: np.ndarray, n_folds: int = 5, seed
             x_train, y_train = [x[j] for j in np.where(folds != i)[0]], y[folds != i]
             x_test, y_test = [x[j] for j in np.where(folds == i)[0]], y[folds == i]
 
-        if architecture == 'gcn':
-            m = GCN(**kwargs)
-            m.train(x_train, y_train)
-            y_hat_mu = m.predict(x_test)
+        train_loader = to_torch_dataloader(x_train, y_train, batch_size=256, num_workers=4, shuffle=False)
+        test_loader = to_torch_dataloader(x_test, y_test, batch_size=256, num_workers=4, shuffle=False)
 
-        elif architecture == 'bnn':
-            m = BayesianNN(**kwargs)
-            m.train(x_train, y_train)
-            y_hat, y_hat_mu, y_hat_sigma = m.predict(x_test)
+        m = Ensemble(architecture=architecture, **kwargs)
+        m.train(train_loader, verbose=False)
 
-        y_hat_bin = (y_hat_mu.cpu() > torch.Tensor([0.5])).float() * 1
-        scores.append(balanced_accuracy_score(y_test, y_hat_bin))
+        test_logits_N_K_C = m.predict(test_loader)
+        y_hat_test = logits_to_pred(test_logits_N_K_C, return_uncertainty=False, return_prob=False)
+        scores.append(balanced_accuracy_score(y_test, y_hat_test.cpu()))
 
         # Delete the NN to free memory
         try:
@@ -189,19 +186,3 @@ def k_fold_cross_validation(x: np.ndarray, y: np.ndarray, n_folds: int = 5, seed
             pass
 
     return sum(scores) / len(scores)
-
-
-# from active_learning.data_prep import MasterDataset
-# from active_learning.utils import Evaluate
-# from active_learning.nn.models import GCNEnsemble
-#
-# ds_test = MasterDataset('test', representation='ecfp')
-# x_train, y_train, smiles_train = ds_test[range(200)]
-#
-# best_hypers = optimize_hyperparameters(x_train, y_train, architecture='bnn', n_calls=15, log_file='testtest.csv')
-#
-# architecture = 'bnn'
-# x = x_train
-# y = y_train
-# n_folds=5
-# seed = 3
