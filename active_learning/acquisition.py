@@ -1,150 +1,172 @@
 
 import numpy as np
-from active_learning.utils import smiles_to_ecfp
-from rdkit.DataStructs import BulkTanimotoSimilarity
 import torch
-ACQUISITION_METHODS = ['random', 'greedy_exploitative', 'greedy_explorative', 'epsilon_greedy_exploitative',
-                          'epsilon_greedy_explorative', 'diversity_explorative', 'diversity_exploitative',
-                          'dynamic_uncertainty', 'dynamic_diversity']
+from torch import Tensor, tensor
+from batchbald_redux.batchbald import get_batchbald_batch
+from rdkit.Chem.AllChem import GetMorganFingerprintAsBitVect as ECFPbitVec
+from rdkit.DataStructs import BulkTanimotoSimilarity
+from rdkit import Chem
+import math
 
 
 class Acquisition:
     def __init__(self, method: str, seed: int = 42, **kwargs):
-        assert method in ACQUISITION_METHODS, f"Specified 'method' not available. Select from: {ACQUISITION_METHODS}"
+
+        self.acquisition_method = {'random': self.random_pick,
+                                   'exploration': greedy_exploration,
+                                   'exploitation': greedy_exploitation,
+                                   'dynamic': dynamic_exploration,
+                                   'bald': bald,
+                                   'batch_bald': batch_bald,
+                                   'similarity': similarity_search}
+
+        assert method in self.acquisition_method.keys(), f"Specified 'method' not available. " \
+                                                         f"Select from: {self.acquisition_method.keys()}"
 
         self.method = method
         self.params = kwargs
         self.rng = np.random.default_rng(seed=seed)
         self.iteration = 0
 
-    def acquire(self, y_hat_mu: np.ndarray, y_hat_sigma: np.ndarray, smiles: np.ndarray, n: int = 1) -> np.ndarray:
+    def acquire(self, logits_N_K_C: Tensor, smiles: np.ndarray[str], hits: np.ndarray[str], n: int = 1) -> \
+            np.ndarray[str]:
 
         self.iteration += 1
 
-        if self.method == 'random':
-            return self.random_pick(smiles=smiles, n=n)
-        if self.method == 'greedy_exploitative':
-            return self.greedy_exploitative(y_hat_mu=y_hat_mu, smiles=smiles, n=n)
-        if self.method == 'greedy_explorative':
-            return self.greedy_explorative(y_hat_sigma=y_hat_sigma, smiles=smiles, n=n)
-        if self.method == 'epsilon_greedy_exploitative':
-            return self.epsilon_greedy_exploitative(y_hat_mu=y_hat_mu, smiles=smiles, n=n, **self.params)
-        if self.method == 'epsilon_greedy_explorative':
-            return self.epsilon_greedy_explorative(y_hat_sigma=y_hat_sigma, smiles=smiles, n=n, **self.params)
-        if self.method == 'diversity_exploitative':
-            return self.diversity_exploitative(y_hat_mu=y_hat_mu, smiles=smiles, n=n)
-        if self.method == 'diversity_explorative':
-            return self.diversity_explorative(y_hat_sigma=y_hat_sigma, smiles=smiles, n=n)
-        if self.method == 'dynamic_uncertainty':
-            return self.dynamic_uncertainty(y_hat_mu=y_hat_mu, y_hat_sigma=y_hat_sigma, smiles=smiles, n=n,
-                                            **self.params)
-        if self.method == 'dynamic_diversity':
-            return self.dynamic_diversity(y_hat_mu=y_hat_mu, y_hat_sigma=y_hat_sigma, smiles=smiles, n=n,
-                                          **self.params)
+        return self.acquisition_method[self.method](logits_N_K_C=logits_N_K_C, smiles=smiles, n=n, hits=hits,
+                                                    iteration=self.iteration, **self.params)
 
-    def __call__(self, y_hat_mu: np.ndarray, y_hat_sigma: np.ndarray, smiles: np.ndarray, n: int = 1, **kwargs) -> \
-            np.ndarray:
-        return self.acquire(y_hat_mu, y_hat_sigma, smiles, n, **kwargs)
+    def __call__(self, *args, **kwargs) -> np.ndarray[str]:
+        return self.acquire(*args, **kwargs)
 
-    def random_pick(self, smiles: np.ndarray, n: int = 1, return_smiles: bool = True) -> np.ndarray:
+    def random_pick(self, smiles: np.ndarray[str], n: int = 1, return_smiles: bool = True, **kwargs) -> np.ndarray:
         """ select n random samples """
         picks_idx = self.rng.integers(0, len(smiles), n)
 
         return smiles[picks_idx] if return_smiles else picks_idx
 
-    @ staticmethod
-    def greedy_exploitative(y_hat_mu: np.ndarray, smiles: np.ndarray, n: int = 1,
-                            return_smiles: bool = True) -> np.ndarray:
-        """ Get the n highest predicted samples """
-        y_hat_mu = np.array(y_hat_mu.cpu()) if type(y_hat_mu) is torch.Tensor else y_hat_mu
-        picks_idx = np.argsort(y_hat_mu)[::-1][:n]
 
-        return smiles[picks_idx] if return_smiles else picks_idx
+def logits_to_pred(logits_N_K_C: Tensor, return_prob: bool = True, return_uncertainty: bool = True) -> (Tensor, Tensor):
+    """ Get the probabilities/class vector and sample uncertainty from the logits """
 
-    @ staticmethod
-    def greedy_explorative(y_hat_sigma: np.ndarray, smiles: np.ndarray, n: int = 1,
-                           return_smiles: bool = True) -> np.ndarray:
-        """ Get the n most uncertain samples """
-        y_hat_sigma = np.array(y_hat_sigma.cpu()) if type(y_hat_sigma) is torch.Tensor else y_hat_sigma
-        picks_idx = np.argsort(y_hat_sigma)[::-1][:n]
+    mean_probs_N_C = torch.mean(torch.exp(logits_N_K_C), dim=1)
+    uncertainty = mean_sample_entropy(logits_N_K_C)
 
-        return smiles[picks_idx] if return_smiles else picks_idx
+    if return_prob:
+        y_hat = mean_probs_N_C
+    else:
+        y_hat = torch.argmax(mean_probs_N_C, dim=1)
 
-    def epsilon_greedy_exploitative(self, y_hat_mu: np.ndarray, smiles: np.ndarray, n: int = 1,
-                                    epsilon: float = 0.1) -> np.ndarray:
-        """ greedy exploitative with an epsilon chance of selecting a random sample """
+    if return_uncertainty:
+        return y_hat, uncertainty
+    else:
+        return y_hat
 
-        n_random_picks = sum((self.rng.random(n) < epsilon) * 1)
-        n_greedy_picks = n - n_random_picks
 
-        greedy_picks = self.greedy_exploitative(y_hat_mu, smiles, n=n_greedy_picks)
-        random_picks = self.random_pick(np.array([i for i in smiles if i not in greedy_picks]), n=n_random_picks)
+def logit_mean(logits_N_K_C: Tensor, dim: int, keepdim: bool = False) -> Tensor:
+    """ Logit mean with the logsumexp trick """
 
-        return np.concatenate((greedy_picks, random_picks))
+    return torch.logsumexp(logits_N_K_C, dim=dim, keepdim=keepdim) - math.log(logits_N_K_C.shape[dim])
 
-    def epsilon_greedy_explorative(self, y_hat_sigma: np.ndarray, smiles: np.ndarray, n: int = 1,
-                                   epsilon: float = 0.1) -> np.ndarray:
-        """ greedy exploitative with an epsilon chance of selecting a random sample """
 
-        n_random_picks = sum((self.rng.random(n) < epsilon) * 1)
-        n_greedy_picks = n - n_random_picks
+def entropy(logits_N_K_C: Tensor, dim: int, keepdim: bool = False) -> Tensor:
+    """Calculates the Shannon Entropy """
 
-        greedy_picks = self.greedy_explorative(y_hat_sigma, smiles, n=n_greedy_picks)
-        random_picks = self.random_pick(np.array([i for i in smiles if i not in greedy_picks]), n=n_random_picks)
+    return -torch.sum((torch.exp(logits_N_K_C) * logits_N_K_C).double(), dim=dim, keepdim=keepdim)
 
-        return np.concatenate((greedy_picks, random_picks))
 
-    def clusters(self, y_hat: np.ndarray, y_hat_sigma: np.ndarray, n: int = 1):
-        """ Select the n samples most representative of n clusters in the data """
-        raise NotImplementedError
+def mean_sample_entropy(logits_N_K_C: Tensor, dim: int = -1, keepdim: bool = False) -> Tensor:
+    """Calculates the mean entropy for each sample given multiple ensemble predictions"""
 
-    def diversity_explorative(self, y_hat_sigma: np.ndarray, smiles: np.ndarray, n: int = 1,
-                              return_smiles: bool = True) -> np.ndarray:
-        """ select the n molecules that are structurally most similar to the n best predicted values """
+    sample_entropies_N_K = entropy(logits_N_K_C, dim=dim, keepdim=keepdim)
+    entropy_mean_N = torch.mean(sample_entropies_N_K, dim=1)
 
-        picks = self.greedy_explorative(y_hat_sigma, smiles, return_smiles=False, n=n)
-        fps = smiles_to_ecfp(smiles, to_array=False)
+    return entropy_mean_N
 
-        S = np.array([BulkTanimotoSimilarity(fps[pick], fps) for pick in picks])
-        most_similar = np.argsort(S)[:, -2]  # we index -2 because -1 is the pick itself
 
-        return smiles[most_similar] if return_smiles else most_similar
+def mutual_information(logits_N_K_C: Tensor) -> Tensor:
+    """ Calculates the Mutual Information """
 
-    def diversity_exploitative(self, y_hat_mu: np.ndarray, smiles: np.ndarray, n: int = 1,
-                               return_smiles: bool = True) -> np.ndarray:
-        """ select the n molecules that are structurally most similar to the n best predicted values """
+    # this term represents the entropy of the model prediction (high when uncertain)
+    entropy_mean_N = mean_sample_entropy(logits_N_K_C)
 
-        picks = self.greedy_exploitative(y_hat_mu, smiles, return_smiles=False, n=n)
-        fps = smiles_to_ecfp(smiles, to_array=False)
+    # This term is the expectation of the entropy of the model prediction for each draw of model parameters
+    mean_entropy_N = entropy(logit_mean(logits_N_K_C, dim=1), dim=-1)
 
-        S = np.array([BulkTanimotoSimilarity(fps[pick], fps) for pick in picks])
-        most_similar = np.argsort(S)[:, -2]  # we index -2 because -1 is the pick itself
+    I = mean_entropy_N - entropy_mean_N
 
-        return smiles[most_similar] if return_smiles else most_similar
+    return I
 
-    def dynamic_uncertainty(self, y_hat_mu: np.ndarray, y_hat_sigma: np.ndarray, smiles: np.ndarray, n: int = 1,
-                            lambd: float = 0.9) -> np.ndarray:
-        """ starts with 100% exploration, approaches the limit of 100% exploitation. The speed in which we stop
-        exploring depends on lambda. For example, a lambda of 0.9 will require 44 iterations to reach full exploitation,
-        a lambda of 0.5 will get there in only 7 iterations """
 
-        exploration_factor = ((lambd ** self.iteration) / 1)
-        n_explore = round(n * exploration_factor)
-        n_exploit = n - n_explore
+def greedy_exploitation(logits_N_K_C: Tensor, smiles: np.ndarray[str], n: int = 1, **kwargs) -> np.ndarray[str]:
+    """ Get the n highest predicted samples """
 
-        exploitative_picks = self.greedy_exploitative(y_hat_mu, smiles, n=n_exploit)
-        explorative_picks = self.greedy_explorative(y_hat_sigma, smiles, n=n_explore)
+    mean_probs_hits = torch.mean(torch.exp(logits_N_K_C), dim=1)[:, 1]
+    picks_idx = torch.argsort(mean_probs_hits, descending=True)[:n]
 
-        return np.concatenate((exploitative_picks, explorative_picks))
+    return np.array([smiles[picks_idx.cpu()]]) if n == 1 else smiles[picks_idx.cpu()]
 
-    def dynamic_diversity(self, y_hat_mu: np.ndarray, y_hat_sigma: np.ndarray, smiles: np.ndarray, n: int = 1,
-                          lambd: float = 0.9) -> np.ndarray:
 
-        exploration_factor = ((lambd ** self.iteration) / 1)
-        n_explore = round(n * exploration_factor)
-        n_exploit = n - n_explore
+def greedy_exploration(logits_N_K_C: Tensor, smiles: np.ndarray[str], n: int = 1, **kwargs) -> np.ndarray[str]:
+    """ Get the n most uncertain samples """
 
-        exploitative_picks = self.diversity_exploitative(y_hat_mu, smiles, n=n_exploit)
-        explorative_picks = self.diversity_explorative(y_hat_sigma, smiles, n=n_explore)
+    entropy_mean_N = mean_sample_entropy(logits_N_K_C)
+    picks_idx = torch.argsort(entropy_mean_N, descending=True)[:n]
 
-        return np.concatenate((exploitative_picks, explorative_picks))
+    return np.array([smiles[picks_idx.cpu()]]) if n == 1 else smiles[picks_idx.cpu()]
+
+
+def dynamic_exploration(logits_N_K_C: Tensor, smiles: np.ndarray[str], n: int = 1, lambd: float = 0.9,
+                        iteration: int = 0, **kwargs) -> np.ndarray[str]:
+    """ starts with 100% exploration, approaches the limit of 100% exploitation. The speed in which we stop
+    exploring depends on lambda. For example, a lambda of 0.9 will require 44 iterations to reach full exploitation,
+    a lambda of 0.5 will get there in only 7 iterations """
+
+    exploration_factor = ((lambd ** iteration) / 1)
+    n_explore = round(n * exploration_factor)
+    n_exploit = n - n_explore
+
+    exploitative_picks = greedy_exploitation(logits_N_K_C, smiles, n=n_exploit)
+    explorative_picks = greedy_exploration(logits_N_K_C, smiles, n=n_explore)
+
+    return np.concatenate((exploitative_picks, explorative_picks))
+
+
+def bald(logits_N_K_C: Tensor, smiles: np.ndarray[str], n: int = 1, **kwargs) -> np.ndarray[str]:
+    """ Get the n molecules with the lowest Mutual Information """
+    I = mutual_information(logits_N_K_C)
+
+    picks_idx = torch.argsort(I, descending=False)[:n]
+
+    return smiles[picks_idx.cpu()]
+
+
+def batch_bald(logits_N_K_C: Tensor, smiles: np.ndarray[str], n: int = 1, num_samples: int = None, **kwargs) -> \
+        np.ndarray[str]:
+    """ Get BatchBALD batch - Kirch et. al, 2019, NeurIPS"""
+    if n == 1:
+        return bald(logits_N_K_C, smiles)
+
+    num_samples = logits_N_K_C.shape[0] if num_samples is None else num_samples
+    candidate_batch = get_batchbald_batch(logits_N_K_C, batch_size=n, num_samples=num_samples,
+                                          device=torch.device("cuda" if torch.cuda.is_available() else "cpu"))
+
+    return smiles[candidate_batch.indices]
+
+
+def similarity_search(hits: np.ndarray[str], smiles: np.ndarray[str], n: int = 1, radius: int = 2, nBits: int = 1024,
+                      **kwargs) -> np.ndarray[str]:
+    """ 1. Compute the similarity of all screen smiles to all hit smiles
+        2. take the n screen smiles with the highest similarity to any hit """
+
+    fp_hits = [ECFPbitVec(Chem.MolFromSmiles(smi), radius=radius, nBits=nBits) for smi in hits]
+    fp_smiles = [ECFPbitVec(Chem.MolFromSmiles(smi), radius=radius, nBits=nBits) for smi in smiles]
+
+    m = np.zeros([len(hits), len(smiles)], dtype=np.float16)
+    for i in range(len(hits)):
+        m[i] = BulkTanimotoSimilarity(fp_hits[i], fp_smiles)
+
+    # get the n highest similarity smiles to any hit
+    picks_idx = np.argsort(np.max(m, axis=0))[::-1][:n]
+
+    return smiles[picks_idx]
