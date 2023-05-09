@@ -1,14 +1,14 @@
-""" Range of hyperparameters that are optimized for each model"""
+""" Range of hyperparameters that will be optimized for each model"""
 
-BNN_hypers = {'lr': [1e-3, 1e-4, 1e-5],                 # categorical
-              'hidden_size': [128, 256, 512, 1024],     # categorical
-              'epochs': [100, 1000, 5000, 10000]}       # categorical
+MLP_hypers = {'lr': [1e-3, 1e-4, 1e-5],                 # categorical
+              'n_hidden': [1024],                       # categorical
+              'epochs': [50, 100, 250, 500],
+              'ensemble_size': [10]}                    # categorical
 
 
 GCN_hypers = {'lr': [1e-3, 1e-4, 1e-5],                 # categorical
-              'hidden_channels': [128, 256, 512, 1024],     # categorical
-              'epochs': [50, 100, 200, 500],            # categorical
-              'num_conv_layers': [1, 5]}                # integer range from 2 - 5
+              'n_hidden': [1024],                       # categorical
+              'epochs': [50, 100, 250],                 # categorical
+              'num_conv_layers': [3, 5],
+              'ensemble_size': [10]}                    # integer range from 2 - 5
 
-
-BGCN_hypers = {}
