@@ -6,7 +6,7 @@ from active_learning.data_prep import MasterDataset
 from active_learning.data_handler import Handler
 from active_learning.utils import Evaluate, to_torch_dataloader
 from active_learning.acquisition import Acquisition, logits_to_pred
-from tqdm import tqdm
+from tqdm.auto import tqdm
 import torch
 from math import ceil
 
@@ -24,8 +24,9 @@ def active_learning(n_start: int = 100, acquisition_method: str = 'exploration',
     ACQ = Acquisition(method=acquisition_method, seed=seed)
     eval_test = Evaluate()
     eval_screen = Evaluate()
+    eval_train = Evaluate()
     x_test, y_test, smiles_test = ds_test.all()
-    test_loader = to_torch_dataloader(x_test, y_test, batch_size=256, num_workers=4, shuffle=False)
+    test_loader = to_torch_dataloader(x_test, y_test, batch_size=512, num_workers=4, shuffle=False, pin_memory=True)
     max_screen_size = len(ds_screen) if max_screen_size is None else max_screen_size
 
     hits_discovered, total_mols_screened, all_train_smiles = [], [], []
@@ -36,8 +37,8 @@ def active_learning(n_start: int = 100, acquisition_method: str = 'exploration',
 
         x_train, y_train, smiles_train = ds_screen[train_idx]
         x_screen, y_screen, smiles_screen = ds_screen[screen_idx]
-        train_loader = to_torch_dataloader(x_train, y_train, batch_size=256, num_workers=4, shuffle=False)
-        screen_loader = to_torch_dataloader(x_screen, y_screen, batch_size=256, num_workers=4, shuffle=False)
+        train_loader = to_torch_dataloader(x_train, y_train, batch_size=32, num_workers=4, shuffle=False, pin_memory=True)
+        screen_loader = to_torch_dataloader(x_screen, y_screen, batch_size=512, num_workers=4, shuffle=False, pin_memory=True)
 
         all_train_smiles.append(';'.join(smiles_train.tolist()))
         hits_discovered.append(sum(y_train))
@@ -55,20 +56,20 @@ def active_learning(n_start: int = 100, acquisition_method: str = 'exploration',
                      class_weights=class_weights)
 
         if cycle == 0 and optimize_hyperparameters:
-            M.optimize_hyperparameters(x_train, y_train)
+            M.optimize_hyperparameters(x_train, y_train, class_weights=class_weights)
 
         print("Training model")
         M.train(train_loader, verbose=False)
 
-        print("Test inference")
-        test_logits_N_K_C = M.predict(test_loader)
-        y_hat_test = logits_to_pred(test_logits_N_K_C, return_uncertainty=False, return_prob=False)
-        eval_test.eval(y_hat_test, y_test)
+        print("Train/test/screen inference")
+        train_logits_N_K_C = M.predict(train_loader)
+        eval_train.eval(train_logits_N_K_C, y_train)
 
-        print("Screen inference")
+        test_logits_N_K_C = M.predict(test_loader)
+        eval_test.eval(test_logits_N_K_C, y_test)
+
         screen_logits_N_K_C = M.predict(screen_loader)
-        y_hat_screen = logits_to_pred(screen_logits_N_K_C, return_uncertainty=False, return_prob=False)
-        eval_screen.eval(y_hat_screen, y_screen)
+        eval_screen.eval(screen_logits_N_K_C, y_screen)
 
         if len(train_idx) + batch_size > max_screen_size:
             batch_size = max_screen_size - len(train_idx)
@@ -78,9 +79,10 @@ def active_learning(n_start: int = 100, acquisition_method: str = 'exploration',
 
         handler.add(picks)
 
+    train_results = eval_train.to_dataframe("train_")
     test_results = eval_test.to_dataframe("test_")
     screen_results = eval_screen.to_dataframe('screen_')
-    results = pd.concat([test_results, screen_results], axis=1)
+    results = pd.concat([train_results, test_results, screen_results], axis=1)
     results['hits_discovered'] = hits_discovered
     results['total_mols_screened'] = total_mols_screened
     results['all_train_smiles'] = all_train_smiles
