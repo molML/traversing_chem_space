@@ -1,41 +1,42 @@
 
 import numpy as np
 import torch
-from torch import Tensor, tensor
-from torch_geometric.loader import DataLoader as pyg_DataLoader
-from torch.utils.data import TensorDataset, DataLoader
-from tqdm.auto import trange, tqdm
+from torch import Tensor
+from torch.utils.data import DataLoader
 from torch.nn import functional as F
-from warnings import warn
 from copy import deepcopy
-from torch.nn import Linear
-from torch_geometric.nn import GCNConv, global_add_pool, GraphNorm
+from torch_geometric.nn import GCNConv, global_add_pool, BatchNorm
 from warnings import warn
 from tqdm.auto import trange
 from active_learning.hyperopt import optimize_hyperparameters
-import math
 
 
 class MLP(torch.nn.Module):
     def __init__(self, in_feats: int = 1024, n_hidden: int = 1024, n_out: int = 2, n_layers: int = 3, seed: int = 42,
-                 lr: float = 1e-4, epochs: int = 100, anchored: bool = True, l2_lambda: float = 1e-5):
+                 lr: float = 3e-4, epochs: int = 100, anchored: bool = True, l2_lambda: float = 1e-4):
         super().__init__()
         self.seed, self.lr, self.l2_lambda, self.epochs, self.anchored = seed, lr, l2_lambda, epochs, anchored
         torch.manual_seed(seed)
 
         self.fc = torch.nn.ModuleList()
+        self.fc_norms = torch.nn.ModuleList()
         for i in range(n_layers):
             self.fc.append(torch.nn.Linear(in_feats if i == 0 else n_hidden, n_hidden))
+            self.fc_norms.append(BatchNorm(n_hidden, allow_single_element=True))
         self.out = torch.nn.Linear(n_hidden, n_out)
 
     def reset_parameters(self):
-        for lin in self.fc:
+        for lin, norm in zip(self.fc, self.fc_norms):
             lin.reset_parameters()
+            norm.reset_parameters()
         self.out.reset_parameters()
 
     def forward(self, x: Tensor) -> Tensor:
-        for lin in self.fc:
-            x = F.relu(lin(x))
+        for lin, norm in zip(self.fc, self.fc_norms):
+            x = lin(x)
+            x = norm(x)
+            x = F.relu(x)
+
         x = self.out(x)
         x = F.log_softmax(x, 1)
 
@@ -43,48 +44,57 @@ class MLP(torch.nn.Module):
 
 
 class GCN(torch.nn.Module):
-    def __init__(self, in_feats: int = 59, n_hidden: int = 1024, num_conv_layers: int = 3, lr: float = 0.0001,
+    def __init__(self, in_feats: int = 59, n_hidden: int = 1024, num_conv_layers: int = 3, lr: float = 3e-4,
                  epochs: int = 100, n_out: int = 2, n_layers: int = 3, seed: int = 42, anchored: bool = True,
-                 l2_lambda: float = 1e-5):
+                 l2_lambda: float = 1e-4):
 
         super().__init__()
         self.seed, self.lr, self.l2_lambda, self.epochs, self.anchored = seed, lr, l2_lambda, epochs, anchored
 
         self.atom_embedding = torch.nn.Linear(in_feats, n_hidden)
-        self.fc = torch.nn.ModuleList()
-        for i in range(n_layers):
-            self.fc.append(torch.nn.Linear(n_hidden, n_hidden))
-        self.out = torch.nn.Linear(n_hidden, n_out)
 
         self.convs = torch.nn.ModuleList()
-        # self.norms = torch.nn.ModuleList()
+        self.norms = torch.nn.ModuleList()
         for _ in range(num_conv_layers):
             self.convs.append(GCNConv(n_hidden, n_hidden))
-            # self.norm = GraphNorm(n_hidden)
+            self.norms.append(BatchNorm(n_hidden, allow_single_element=True))
+
+        self.fc = torch.nn.ModuleList()
+        self.fc_norms = torch.nn.ModuleList()
+        for i in range(n_layers):
+            self.fc.append(torch.nn.Linear(n_hidden, n_hidden))
+            self.fc_norms.append(BatchNorm(n_hidden, allow_single_element=True))
+
+        self.out = torch.nn.Linear(n_hidden, n_out)
 
     def reset_parameters(self):
         self.atom_embedding.reset_parameters()
-        for conv in self.convs:
+        for conv, norm in zip(self.convs, self.norms):
             conv.reset_parameters()
-            # norm.reset_parameters()
-        for lin in self.fc:
+            norm.reset_parameters()
+        for lin, norm in zip(self.fc, self.fc_norms):
             lin.reset_parameters()
+            norm.reset_parameters()
         self.out.reset_parameters()
 
     def forward(self, x: Tensor, edge_index: Tensor, batch: Tensor) -> Tensor:
         # Atom Embedding:
-        x = F.relu(self.atom_embedding(x))
+        x = F.elu(self.atom_embedding(x))
 
         # Graph convolutions
-        for conv in self.convs:
+        for conv, norm in zip(self.convs, self.norms):
             x = conv(x, edge_index)
+            x = norm(x)
             x = F.relu(x)
 
         # Perform global pooling by sum pooling
         x = global_add_pool(x, batch)
 
-        for lin in self.fc:
-            x = F.relu(lin(x))
+        for lin, norm in zip(self.fc, self.fc_norms):
+            x = lin(x)
+            x = norm(x)
+            x = F.relu(x)
+
         x = self.out(x)
         x = F.log_softmax(x, 1)
 
@@ -189,16 +199,18 @@ class Model(torch.nn.Module):
 
 class Ensemble(torch.nn.Module):
     """ Ensemble of GCNs"""
-    def __init__(self, ensemble_size: int = 10, seed: int = 0, **kwargs) -> None:
+    def __init__(self, ensemble_size: int = 10, seed: int = 0, architecture: str = 'mlp', class_weights=None, **kwargs) -> None:
         self.ensemble_size = ensemble_size
+        self.architecture = architecture
+        self.class_weights = class_weights
         self.seed = seed
         rng = np.random.default_rng(seed=seed)
         self.seeds = rng.integers(0, 1000, ensemble_size)
-        self.models = {i: Model(seed=s, **kwargs) for i, s in enumerate(self.seeds)}
+        self.models = {i: Model(seed=s, architecture=architecture, **kwargs) for i, s in enumerate(self.seeds)}
 
     def optimize_hyperparameters(self, x, y: DataLoader, **kwargs):
         # raise NotImplementedError
-        best_hypers = optimize_hyperparameters(x, y, architecture='gcn', **kwargs)
+        best_hypers = optimize_hyperparameters(x, y, architecture=self.architecture, class_weights=self.class_weights, **kwargs)
         # # re-init model wrapper with optimal hyperparameters
         self.__init__(ensemble_size=self.ensemble_size, seed=self.seed, **best_hypers)
 
