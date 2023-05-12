@@ -1,11 +1,10 @@
 
 import os
-from tqdm import tqdm
+from tqdm.auto import tqdm
 from active_learning.screening import active_learning
 import itertools
 import argparse
 
-from config import ROOT_DIR
 
 PARAMETERS = {'max_screen_size': [1000],
               'n_start': [64],
@@ -19,20 +18,18 @@ PARAMETERS = {'max_screen_size': [1000],
 
 if __name__ == '__main__':
 
-    # parser = argparse.ArgumentParser()
-    # parser.add_argument('-o', help='The path of the output directory', default='results')
-    # parser.add_argument('-acq', help="Acquisition function ('random', 'exploration', 'exploitation', 'dynamic', "
-    #                                  "'batch_bald', 'similarity')", default='random')
-    # parser.add_argument('-bias', help='The level of bias ("random", "small", "large")', default='results')
-    # parser.add_argument('-arch', help='The neural network architecture ("gcn", "mlp")', default='mlp')
-    # args = parser.parse_args()
-    #
-    # PARAMETERS['acquisition'] = [args.acq]
-    # PARAMETERS['bias'] = [args.bias]
-    # PARAMETERS['architecture'] = [args.arch]
-    # LOG_FILE = f'{args.o}/{args.acq}){args.bias}){args.arch})simulation_results.csv'
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-o', help='The path of the output directory', default='results')
+    parser.add_argument('-acq', help="Acquisition function ('random', 'exploration', 'exploitation', 'dynamic', "
+                                     "'batch_bald', 'similarity')", default='random')
+    parser.add_argument('-bias', help='The level of bias ("random", "small", "large")', default='results')
+    parser.add_argument('-arch', help='The neural network architecture ("gcn", "mlp")', default='mlp')
+    args = parser.parse_args()
 
-    LOG_FILE = f'simulation_results.csv'
+    PARAMETERS['acquisition'] = [args.acq]
+    PARAMETERS['bias'] = [args.bias]
+    PARAMETERS['architecture'] = [args.arch]
+    LOG_FILE = f'{args.o}/{args.arch}_{args.acq}_{args.bias}_simulation_results.csv'
 
     experiments = [dict(zip(PARAMETERS.keys(), v)) for v in itertools.product(*PARAMETERS.values())]
 
@@ -52,6 +49,7 @@ if __name__ == '__main__':
         results['architecture'] = experiment['architecture']
         results['n_start'] = experiment['n_start']
         results['batch_size'] = experiment['batch_size']
-        results['replica'] = experiment['replica']
+        results['seed'] = experiment['seed']
+        results['bias'] = experiment['bias']
 
         results.to_csv(LOG_FILE, mode='a', index=False, header=False if os.path.isfile(LOG_FILE) else True)
