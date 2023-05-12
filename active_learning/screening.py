@@ -11,9 +11,9 @@ import torch
 from math import ceil
 
 
-def active_learning(n_start: int = 100, acquisition_method: str = 'exploration', max_screen_size: int = None,
-                    batch_size: int = 16, architecture: str = 'gcn', seed: int = 0,
-                    optimize_hyperparameters: bool = False, bias: str = 'random'):
+def active_learning(n_start: int = 64, acquisition_method: str = 'exploration', max_screen_size: int = None,
+                    batch_size: int = 16, architecture: str = 'gcn', seed: int = 0, bias: str = 'random',
+                    optimize_hyperparameters: bool = False, ensemble_size: int = 5):
 
     representation = 'ecfp' if architecture == 'mlp' else 'graph'
 
@@ -32,7 +32,7 @@ def active_learning(n_start: int = 100, acquisition_method: str = 'exploration',
     hits_discovered, total_mols_screened, all_train_smiles = [], [], []
 
     for cycle in tqdm(range(ceil((max_screen_size - n_start)/batch_size)+1)):
-        # break
+
         train_idx, screen_idx = handler()
 
         x_train, y_train, smiles_train = ds_screen[train_idx]
@@ -52,8 +52,7 @@ def active_learning(n_start: int = 100, acquisition_method: str = 'exploration',
         class_weights = torch.tensor([1 - sum((y_train == 0) * 1)/len(y_train),
                                       1 - sum((y_train == 1) * 1)/len(y_train)])
 
-        M = Ensemble(seed=seed, ensemble_size=3, architecture=architecture, epochs=100, l2_lambda=1e-6,
-                     class_weights=class_weights)
+        M = Ensemble(seed=seed, ensemble_size=ensemble_size, architecture=architecture, class_weights=class_weights)
 
         if cycle == 0 and optimize_hyperparameters:
             M.optimize_hyperparameters(x_train, y_train, class_weights=class_weights)
