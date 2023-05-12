@@ -135,35 +135,44 @@ class Evaluate:
         self.balanced_accuracy = [0]
         self.precision = [0]
         self.tpr = [0]
+        self.roc_auc = [0]
         self.tn, self.fp, self.fn, self.tp = [0], [0], [0], [0]
 
-    def eval(self, y_hat: torch.Tensor, y: torch.Tensor):
+    def eval(self, logits_N_K_C: torch.Tensor, y: torch.Tensor):
 
         y = y.cpu() if type(y) is torch.Tensor else torch.tensor(y)
+        y_hat = torch.mean(torch.exp(logits_N_K_C), dim=1)
         y_hat = y_hat.cpu() if type(y_hat) is torch.Tensor else torch.tensor(y_hat)
 
+        y_hat_bin = torch.argmax(y_hat, dim=1)
+        y_hat = y_hat[:, 1]
+
         # calc_binary_accuracy
-        acc = torch.sum(y_hat == y) / len(y)
+        acc = torch.sum(y_hat_bin == y) / len(y)
         self.binary_accuracy.append(acc.item())
 
         # calc_balanced_accuracy
-        balanced_acc = balanced_accuracy_score(y, y_hat)
+        balanced_acc = balanced_accuracy_score(y, y_hat_bin)
         self.balanced_accuracy.append(balanced_acc)
+
+        # calc roc-auc
+        roc_auc = roc_auc_score(y, y_hat)
+        self.roc_auc.append(roc_auc)
 
         # calc_precision
         try:
-            self.precision.append(precision_score(y, y_hat, zero_division=0))
+            self.precision.append(precision_score(y, y_hat_bin, zero_division=0))
         except:
             self.precision.append(0)
 
         # calc recall
         try:
-            self.tpr.append(recall_score(y, y_hat))
+            self.tpr.append(recall_score(y, y_hat_bin))
         except:
             self.tpr.append(0)
 
         # calc confusion
-        tn, fp, fn, tp = confusion_matrix(y, y_hat).ravel()
+        tn, fp, fn, tp = confusion_matrix(y, y_hat_bin).ravel()
         self.tn.append(tn)
         self.fp.append(fp)
         self.fn.append(fn)
@@ -172,6 +181,7 @@ class Evaluate:
     def __repr__(self):
         return f"Binary accuracy:    {self.binary_accuracy[-1]:.4f}\n" \
                f"Balanced accuracy:  {self.balanced_accuracy[-1]:.4f}\n" \
+               f"ROC AUC:            {self.roc_auc[-1]:.4f}\n" \
                f"Precision:          {self.precision[-1]:.4f}\n" \
                f"True positive rate: {self.tpr[-1]:.4f}\n" \
                f"Hits:               {self.tp[-1]}\n" \
@@ -181,7 +191,8 @@ class Evaluate:
 
     def to_dataframe(self, colnames: str = ''):
         df = pd.DataFrame({'cycle': list(range(len(self.tp))), 'binary_accuracy': self.binary_accuracy,
-                           'balanced_accuracy': self.balanced_accuracy, 'precision': self.precision, 'tpr': self.tpr,
+                           'balanced_accuracy': self.balanced_accuracy, 'roc_auc': self.roc_auc,
+                           'precision': self.precision, 'tpr': self.tpr,
                            'tp': self.tp, 'fn': self.fn, 'fp': self.fp, 'tn': self.tn})
         df.columns = [f"{colnames}{i}" for i in df.columns]
 
