@@ -8,6 +8,7 @@ from active_learning.utils import Evaluate, to_torch_dataloader
 from active_learning.acquisition import Acquisition, logits_to_pred
 from tqdm.auto import tqdm
 import torch
+from torch.utils.data import WeightedRandomSampler
 from math import ceil
 
 
@@ -37,7 +38,14 @@ def active_learning(n_start: int = 64, acquisition_method: str = 'exploration', 
 
         x_train, y_train, smiles_train = ds_screen[train_idx]
         x_screen, y_screen, smiles_screen = ds_screen[screen_idx]
-        train_loader = to_torch_dataloader(x_train, y_train, batch_size=32, num_workers=4, shuffle=False, pin_memory=True)
+
+        # Get class weight to build a weighted random sampler to balance out this data
+        class_weights = [1 - sum((y_train == 0) * 1) / len(y_train), 1 - sum((y_train == 1) * 1) / len(y_train)]
+        weights = [class_weights[i] for i in y_train]
+        sampler = WeightedRandomSampler(weights, num_samples=len(y_train), replacement=True)
+
+        train_loader = to_torch_dataloader(x_train, y_train, batch_size=512, num_workers=4, shuffle=False, pin_memory=True)
+        train_loader_balanced = to_torch_dataloader(x_train, y_train, batch_size=64, sampler=sampler, num_workers=4, shuffle=False, pin_memory=True)
         screen_loader = to_torch_dataloader(x_screen, y_screen, batch_size=512, num_workers=4, shuffle=False, pin_memory=True)
 
         all_train_smiles.append(';'.join(smiles_train.tolist()))
@@ -48,17 +56,13 @@ def active_learning(n_start: int = 64, acquisition_method: str = 'exploration', 
         if len(train_idx) >= max_screen_size:
             break
 
-        # we weigh classes based on the information in the training set.
-        class_weights = torch.tensor([1 - sum((y_train == 0) * 1)/len(y_train),
-                                      1 - sum((y_train == 1) * 1)/len(y_train)])
-
-        M = Ensemble(seed=seed, ensemble_size=ensemble_size, architecture=architecture, class_weights=class_weights)
+        M = Ensemble(seed=seed, ensemble_size=ensemble_size, architecture=architecture)
 
         if cycle == 0 and optimize_hyperparameters:
-            M.optimize_hyperparameters(x_train, y_train, class_weights=class_weights)
+            M.optimize_hyperparameters(x_train, y_train)
 
         print("Training model")
-        M.train(train_loader, verbose=False)
+        M.train(train_loader_balanced, verbose=False)
 
         print("Train/test/screen inference")
         train_logits_N_K_C = M.predict(train_loader)
