@@ -13,8 +13,8 @@ Here N is a molecule, K are the number of sampled predictions (i.e., 10 for a 10
     - greedy_exploitation: Get the n highest predicted samples
     - greedy_exploration: Get the n most uncertain samples (based on entropy)
     - dynamic_exploration: Gradually move from greedy exploration to greedy exploitation
-    - bald: Get the n molecules with the lowest Mutual Information - Houlsby et. al, 2011
-    - batch_bald: Get BatchBALD batch - Kirch et. al, 2019, NeurIPS
+    - bald: Get the n molecules with the lowest Mutual Information - Houlsby et al., 2011
+    - batch_bald: Get BatchBALD batch - Kirch et al., 2019, NeurIPS
     - similarity_search: Perform similarity search, take the n screen mols with the highest similarity to any hit
 
     Author: Derek van Tilborg, Eindhoven University of Technology, May 2023
@@ -86,7 +86,7 @@ def logits_to_pred(logits_N_K_C: Tensor, return_prob: bool = True, return_uncert
 
 
 def logit_mean(logits_N_K_C: Tensor, dim: int, keepdim: bool = False) -> Tensor:
-    """ Logit mean with the logsumexp trick - Kirch et. al, 2019, NeurIPS """
+    """ Logit mean with the logsumexp trick - Kirch et al., 2019, NeurIPS """
 
     return torch.logsumexp(logits_N_K_C, dim=dim, keepdim=keepdim) - math.log(logits_N_K_C.shape[dim])
 
@@ -98,7 +98,7 @@ def entropy(logits_N_K_C: Tensor, dim: int, keepdim: bool = False) -> Tensor:
 
 
 def mean_sample_entropy(logits_N_K_C: Tensor, dim: int = -1, keepdim: bool = False) -> Tensor:
-    """Calculates the mean entropy for each sample given multiple ensemble predictions - Kirch et. al, 2019, NeurIPS"""
+    """Calculates the mean entropy for each sample given multiple ensemble predictions - Kirch et al., 2019, NeurIPS"""
 
     sample_entropies_N_K = entropy(logits_N_K_C, dim=dim, keepdim=keepdim)
     entropy_mean_N = torch.mean(sample_entropies_N_K, dim=1)
@@ -107,7 +107,7 @@ def mean_sample_entropy(logits_N_K_C: Tensor, dim: int = -1, keepdim: bool = Fal
 
 
 def mutual_information(logits_N_K_C: Tensor) -> Tensor:
-    """ Calculates the Mutual Information - Kirch et. al, 2019, NeurIPS """
+    """ Calculates the Mutual Information - Kirch et al., 2019, NeurIPS """
 
     # this term represents the entropy of the model prediction (high when uncertain)
     entropy_mean_N = mean_sample_entropy(logits_N_K_C)
@@ -165,7 +165,7 @@ def bald(logits_N_K_C: Tensor, smiles: np.ndarray[str], n: int = 1, **kwargs) ->
 
 def batch_bald(logits_N_K_C: Tensor, smiles: np.ndarray[str], n: int = 1, num_samples: int = None, **kwargs) -> \
         np.ndarray[str]:
-    """ Get BatchBALD batch - Kirch et. al, 2019, NeurIPS"""
+    """ Get BatchBALD batch - Kirch et al., 2019, NeurIPS"""
     if n == 1:
         return bald(logits_N_K_C, smiles)
 
