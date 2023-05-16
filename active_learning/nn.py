@@ -6,16 +6,17 @@ from torch.utils.data import DataLoader
 from torch.nn import functional as F
 from copy import deepcopy
 from torch_geometric.nn import GCNConv, global_add_pool, BatchNorm
-from warnings import warn
 from tqdm.auto import trange
 from active_learning.hyperopt import optimize_hyperparameters
 
 
 class MLP(torch.nn.Module):
     def __init__(self, in_feats: int = 1024, n_hidden: int = 1024, n_out: int = 2, n_layers: int = 3, seed: int = 42,
-                 lr: float = 3e-4, epochs: int = 100, anchored: bool = True, l2_lambda: float = 1e-4):
+                 lr: float = 3e-4, epochs: int = 50, anchored: bool = True, l2_lambda: float = 3e-4,
+                 weight_decay: float = 0):
         super().__init__()
         self.seed, self.lr, self.l2_lambda, self.epochs, self.anchored = seed, lr, l2_lambda, epochs, anchored
+        self.weight_decay = weight_decay
         torch.manual_seed(seed)
 
         self.fc = torch.nn.ModuleList()
@@ -45,11 +46,12 @@ class MLP(torch.nn.Module):
 
 class GCN(torch.nn.Module):
     def __init__(self, in_feats: int = 59, n_hidden: int = 1024, num_conv_layers: int = 3, lr: float = 3e-4,
-                 epochs: int = 100, n_out: int = 2, n_layers: int = 3, seed: int = 42, anchored: bool = True,
-                 l2_lambda: float = 1e-4):
+                 epochs: int = 50, n_out: int = 2, n_layers: int = 3, seed: int = 42, anchored: bool = True,
+                 l2_lambda: float = 3e-4, weight_decay: float = 0):
 
         super().__init__()
         self.seed, self.lr, self.l2_lambda, self.epochs, self.anchored = seed, lr, l2_lambda, epochs, anchored
+        self.weight_decay = weight_decay
 
         self.atom_embedding = torch.nn.Linear(in_feats, n_hidden)
 
@@ -102,20 +104,20 @@ class GCN(torch.nn.Module):
 
 
 class Model(torch.nn.Module):
-    def __init__(self, architecture: str, class_weights: list = None,  **kwargs):
+    def __init__(self, architecture: str, **kwargs):
         super().__init__()
         assert architecture in ['gcn', 'mlp']
         self.architecture = architecture
         self.model = MLP(**kwargs) if architecture == 'mlp' else GCN(**kwargs)
 
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        if class_weights is not None:
-            class_weights = class_weights.float().to(self.device)
-        self.loss_fn = torch.nn.NLLLoss(weight=class_weights)
+        self.device_type = "cuda" if torch.cuda.is_available() else "cpu"
+        self.device = torch.device(self.device_type)
+        self.loss_fn = torch.nn.NLLLoss()
 
         # Move the whole model to the gpu
         self.model = self.model.to(self.device)
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.model.lr)
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.model.lr,
+                                          weight_decay=self.model.weight_decay)
 
         # Save initial weights in the model for the anchored regularization and move them to the gpu
         if self.model.anchored:
@@ -128,6 +130,7 @@ class Model(torch.nn.Module):
     def train(self, dataloader: DataLoader, epochs: int = None, verbose: bool = True) -> None:
 
         bar = trange(self.epochs if epochs is None else epochs, disable=not verbose)
+        scaler = torch.cuda.amp.GradScaler()
 
         for _ in bar:
             running_loss = 0
@@ -137,37 +140,39 @@ class Model(torch.nn.Module):
 
                 self.optimizer.zero_grad()
 
-                if self.architecture == 'gcn':
-                    batch.to(self.device)
-                    y = batch.y
-                    y_hat = self.model(batch.x.float(), batch.edge_index, batch.batch)
-                else:
-                    x, y = batch[0].to(self.device), batch[1].to(self.device)
-                    y_hat = self.model(x)
+                with torch.autocast(device_type=self.device_type, dtype=torch.float16):
 
-                if len(y_hat) == 0:
-                    y_hat = y_hat.unsqueeze(0)
-                loss = self.loss_fn(y_hat, y.squeeze())
+                    if self.architecture == 'gcn':
+                        batch.to(self.device)
+                        y = batch.y
+                        y_hat = self.model(batch.x.float(), batch.edge_index, batch.batch)
+                    else:
+                        x, y = batch[0].to(self.device), batch[1].to(self.device)
+                        y_hat = self.model(x)
 
-                if self.model.anchored:
-                    # Calculate the total anchored L2 loss
-                    l2_loss = 0
-                    for param_name, params in self.model.named_parameters():
-                        anchored_param = self.model.anchor_weights[param_name]
+                    if len(y_hat) == 0:
+                        y_hat = y_hat.unsqueeze(0)
+                    loss = self.loss_fn(y_hat, y.squeeze())
 
-                        l2_loss += (self.model.l2_lambda / len(y)) * torch.mul(params - anchored_param,
-                                                                               params - anchored_param).sum()
+                    if self.model.anchored:
+                        # Calculate the total anchored L2 loss
+                        l2_loss = 0
+                        for param_name, params in self.model.named_parameters():
+                            anchored_param = self.model.anchor_weights[param_name]
 
-                    # Add anchored loss to regular loss according to Pearce et al. (2018)
-                    loss = loss + l2_loss
+                            l2_loss += (self.model.l2_lambda / len(y)) * torch.mul(params - anchored_param,
+                                                                                   params - anchored_param).sum()
 
-                if not loss >= 0:
-                    warn(f"Failed forward pass on batch {idx}, y_hat = {y_hat}", category=RuntimeWarning)
-                else:
-                    loss.backward()
-                    self.optimizer.step()
+                        # Add anchored loss to regular loss according to Pearce et al. (2018)
+                        loss = loss + l2_loss
 
-                    running_loss += loss.item() * len(y)
+                    scaler.scale(loss).backward()
+                    # loss.backward()
+                    scaler.step(self.optimizer)
+                    # self.optimizer.step()
+                    scaler.update()
+
+                    running_loss += loss.item()
                     items += len(y)
 
             epoch_loss = running_loss / items
@@ -183,26 +188,26 @@ class Model(torch.nn.Module):
         """
         y_hats = torch.tensor([]).to(self.device)
         with torch.no_grad():
-            for batch in dataloader:
-                if self.architecture == 'gcn':
-                    batch.to(self.device)
-                    y_hat = self.model(batch.x.float(), batch.edge_index, batch.batch)
-                else:
-                    x = batch[0].to(self.device)
-                    y_hat = self.model(x)
-                if len(y_hat) == 0:
-                    y_hat = y_hat.unsqueeze(0)
-                y_hats = torch.cat((y_hats, y_hat), 0)
+            with torch.autocast(device_type=self.device_type, dtype=torch.float16):
+                for batch in dataloader:
+                    if self.architecture == 'gcn':
+                        batch.to(self.device)
+                        y_hat = self.model(batch.x.float(), batch.edge_index, batch.batch)
+                    else:
+                        x = batch[0].to(self.device)
+                        y_hat = self.model(x)
+                    if len(y_hat) == 0:
+                        y_hat = y_hat.unsqueeze(0)
+                    y_hats = torch.cat((y_hats, y_hat), 0)
 
         return y_hats
 
 
 class Ensemble(torch.nn.Module):
     """ Ensemble of GCNs"""
-    def __init__(self, ensemble_size: int = 10, seed: int = 0, architecture: str = 'mlp', class_weights=None, **kwargs) -> None:
+    def __init__(self, ensemble_size: int = 10, seed: int = 0, architecture: str = 'mlp', **kwargs) -> None:
         self.ensemble_size = ensemble_size
         self.architecture = architecture
-        self.class_weights = class_weights
         self.seed = seed
         rng = np.random.default_rng(seed=seed)
         self.seeds = rng.integers(0, 1000, ensemble_size)
@@ -210,7 +215,7 @@ class Ensemble(torch.nn.Module):
 
     def optimize_hyperparameters(self, x, y: DataLoader, **kwargs):
         # raise NotImplementedError
-        best_hypers = optimize_hyperparameters(x, y, architecture=self.architecture, class_weights=self.class_weights, **kwargs)
+        best_hypers = optimize_hyperparameters(x, y, architecture=self.architecture, **kwargs)
         # # re-init model wrapper with optimal hyperparameters
         self.__init__(ensemble_size=self.ensemble_size, seed=self.seed, **best_hypers)
 
