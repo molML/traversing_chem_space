@@ -1,3 +1,12 @@
+"""
+
+This script contains the class that manages the data over cycles
+
+    - Handler: class that manages getting the start data and adding new samples to it every active learning cycle.
+
+    Author: Derek van Tilborg, Eindhoven University of Technology, May 2023
+
+"""
 
 from typing import Union
 import numpy as np
