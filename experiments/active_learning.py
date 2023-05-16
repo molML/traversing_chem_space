@@ -8,7 +8,7 @@ import argparse
 
 PARAMETERS = {'max_screen_size': [1000],
               'n_start': [64],
-              'batch_size': [16, 32, 64],
+              'batch_size': [64, 32, 16],
               'architecture': ['gcn', 'mlp'],
               'seed': list(range(20)),
               'bias': ['random', 'small', 'large'],
