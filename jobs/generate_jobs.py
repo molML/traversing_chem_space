@@ -1,7 +1,7 @@
 
 
 project_name = "Active_Learning_Simulation"
-hours = 100
+hours = 120
 
 
 acquisitions = ['random', 'exploration', 'exploitation', 'dynamic', 'batch_bald', 'similarity']
@@ -36,7 +36,7 @@ for arch in architectures:
 
 source $HOME/anaconda3/etc/profile.d/conda.sh
 export PYTHONPATH="${'PYTHONPATH'}:$HOME/projects/{project_name}"
-$HOME/anaconda3/envs/molml/bin/python -u $HOME/projects/{project_name}/experiments/snellius_cluster.py -o /home/tilborgd/projects/{project_name}/{output} -acq {acq} -bias {bias} -arch {arch} > $HOME/projects/{project_name}/{output}/{experiment_name}.log
+$HOME/anaconda3/envs/molml/bin/python -u $HOME/projects/{project_name}/experiments/active_learning.py -o /home/tilborgd/projects/{project_name}/{output} -acq {acq} -bias {bias} -arch {arch} > $HOME/projects/{project_name}/{output}/{experiment_name}.log
 """
 
 
