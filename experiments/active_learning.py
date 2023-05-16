@@ -1,9 +1,12 @@
 
+import sys
 import os
 from tqdm.auto import tqdm
 from active_learning.screening import active_learning
 import itertools
 import argparse
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 
 PARAMETERS = {'max_screen_size': [1000],
