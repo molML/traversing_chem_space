@@ -31,6 +31,11 @@ if __name__ == '__main__':
     PARAMETERS['architecture'] = [args.arch]
     LOG_FILE = f'{args.o}/{args.arch}_{args.acq}_{args.bias}_simulation_results.csv'
 
+    # PARAMETERS['acquisition'] = ['random']
+    # PARAMETERS['bias'] = ['random']
+    # PARAMETERS['architecture'] = ['gcn']
+    # LOG_FILE = f"results/{PARAMETERS['architecture'][0]}_{PARAMETERS['acquisition'][0]}_{PARAMETERS['bias'][0]}_simulation_results.csv"
+
     experiments = [dict(zip(PARAMETERS.keys(), v)) for v in itertools.product(*PARAMETERS.values())]
 
     for experiment in tqdm(experiments):
