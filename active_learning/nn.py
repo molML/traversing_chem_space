@@ -1,3 +1,16 @@
+"""
+
+This script contains all models:
+
+    - MLP: a simple feed forward multi-layer perceptron. Supports weight anchoring - Pearce et al. (2018)
+    - GCN: a simple graph convolutional NN - Kipf & Welling (2016). Supports weight anchoring - Pearce et al. (2018)
+    - Model: A wrapper class that contains a train(), and predict() loop
+    - Ensemble: Class that ensembles n Model classes. Contains a train() method and an predict() method that outputs
+        logits_N_K_C, defined as [N, num_inference_samples, num_classes]. Also has an optimize_hyperparameters() method.
+
+    Author: Derek van Tilborg, Eindhoven University of Technology, May 2023
+
+"""
 
 import numpy as np
 import torch
