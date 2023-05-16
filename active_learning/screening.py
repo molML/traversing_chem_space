@@ -1,3 +1,10 @@
+"""
+
+This script contains the main active learning loop that runs all experiments.
+
+    Author: Derek van Tilborg, Eindhoven University of Technology, May 2023
+
+"""
 
 import pandas as pd
 import numpy as np
@@ -12,42 +19,57 @@ from torch.utils.data import WeightedRandomSampler
 from math import ceil
 
 
+INFERENCE_BATCH_SIZE = 512
+TRAINING_BATCH_SIZE = 64
+NUM_WORKERS = 4
+
+
 def active_learning(n_start: int = 64, acquisition_method: str = 'exploration', max_screen_size: int = None,
                     batch_size: int = 16, architecture: str = 'gcn', seed: int = 0, bias: str = 'random',
-                    optimize_hyperparameters: bool = False, ensemble_size: int = 5):
+                    optimize_hyperparameters: bool = False, ensemble_size: int = 10) -> pd.DataFrame:
+    """
+    :param n_start: number of molecules to start out with
+    :param acquisition_method: acquisition method, as defined in active_learning.acquisition
+    :param max_screen_size: we stop when this number of molecules has been screened
+    :param batch_size: number of molecules to add every cycle
+    :param architecture: 'gcn' or 'mlp'
+    :param seed: int 1-20
+    :param bias: 'random', 'small', 'large'
+    :param optimize_hyperparameters: Bool
+    :param ensemble_size: number of models in the ensemble, default is 10
+    :return: dataframe with results
+    """
 
+    # Load the datasets
     representation = 'ecfp' if architecture == 'mlp' else 'graph'
-
     ds_screen = MasterDataset('screen', representation=representation)
     ds_test = MasterDataset('test', representation=representation)
 
+    # Initiate evaluation trackers
+    eval_test, eval_screen, eval_train = Evaluate(), Evaluate(), Evaluate()
     handler = Handler(n_start=n_start, seed=seed, bias=bias)
     ACQ = Acquisition(method=acquisition_method, seed=seed)
-    eval_test = Evaluate()
-    eval_screen = Evaluate()
-    eval_train = Evaluate()
-    x_test, y_test, smiles_test = ds_test.all()
-    test_loader = to_torch_dataloader(x_test, y_test, batch_size=512, num_workers=4, shuffle=False, pin_memory=True)
+
+    # Define some variables
+    hits_discovered, total_mols_screened, all_train_smiles = [], [], []
     max_screen_size = len(ds_screen) if max_screen_size is None else max_screen_size
 
-    hits_discovered, total_mols_screened, all_train_smiles = [], [], []
+    # build test loader
+    x_test, y_test, smiles_test = ds_test.all()
+    test_loader = to_torch_dataloader(x_test, y_test,
+                                      batch_size=INFERENCE_BATCH_SIZE,
+                                      num_workers=NUM_WORKERS,
+                                      shuffle=False, pin_memory=True)
 
+    # While max_screen_size has not been achieved, do some active learning in cycles
     for cycle in tqdm(range(ceil((max_screen_size - n_start)/batch_size)+1)):
 
+        # Get the train and screen data for this cycle
         train_idx, screen_idx = handler()
-
         x_train, y_train, smiles_train = ds_screen[train_idx]
         x_screen, y_screen, smiles_screen = ds_screen[screen_idx]
 
-        # Get class weight to build a weighted random sampler to balance out this data
-        class_weights = [1 - sum((y_train == 0) * 1) / len(y_train), 1 - sum((y_train == 1) * 1) / len(y_train)]
-        weights = [class_weights[i] for i in y_train]
-        sampler = WeightedRandomSampler(weights, num_samples=len(y_train), replacement=True)
-
-        train_loader = to_torch_dataloader(x_train, y_train, batch_size=512, num_workers=4, shuffle=False, pin_memory=True)
-        train_loader_balanced = to_torch_dataloader(x_train, y_train, batch_size=64, sampler=sampler, num_workers=4, shuffle=False, pin_memory=True)
-        screen_loader = to_torch_dataloader(x_screen, y_screen, batch_size=512, num_workers=4, shuffle=False, pin_memory=True)
-
+        # Update some tracking variables
         all_train_smiles.append(';'.join(smiles_train.tolist()))
         hits_discovered.append(sum(y_train))
         hits = smiles_train[np.where(y_train == 1)]
@@ -56,14 +78,36 @@ def active_learning(n_start: int = 64, acquisition_method: str = 'exploration', 
         if len(train_idx) >= max_screen_size:
             break
 
-        M = Ensemble(seed=seed, ensemble_size=ensemble_size, architecture=architecture)
+        # Get class weight to build a weighted random sampler to balance out this data
+        class_weights = [1 - sum((y_train == 0) * 1) / len(y_train), 1 - sum((y_train == 1) * 1) / len(y_train)]
+        weights = [class_weights[i] for i in y_train]
+        sampler = WeightedRandomSampler(weights, num_samples=len(y_train), replacement=True)
 
+        # Get the screen and train + balanced train loaders
+        train_loader = to_torch_dataloader(x_train, y_train,
+                                           batch_size=INFERENCE_BATCH_SIZE,
+                                           num_workers=NUM_WORKERS,
+                                           shuffle=False, pin_memory=True)
+
+        train_loader_balanced = to_torch_dataloader(x_train, y_train,
+                                                    batch_size=TRAINING_BATCH_SIZE,
+                                                    sampler=sampler,
+                                                    num_workers=NUM_WORKERS,
+                                                    shuffle=False, pin_memory=True)
+
+        screen_loader = to_torch_dataloader(x_screen, y_screen,
+                                            batch_size=INFERENCE_BATCH_SIZE,
+                                            num_workers=NUM_WORKERS,
+                                            shuffle=False, pin_memory=True)
+
+        # Initiate and train the model (optimize if specified)
+        print("Training model")
+        M = Ensemble(seed=seed, ensemble_size=ensemble_size, architecture=architecture)
         if cycle == 0 and optimize_hyperparameters:
             M.optimize_hyperparameters(x_train, y_train)
-
-        print("Training model")
         M.train(train_loader_balanced, verbose=False)
 
+        # Do inference of the train/test/screen data
         print("Train/test/screen inference")
         train_logits_N_K_C = M.predict(train_loader)
         eval_train.eval(train_logits_N_K_C, y_train)
@@ -74,14 +118,16 @@ def active_learning(n_start: int = 64, acquisition_method: str = 'exploration', 
         screen_logits_N_K_C = M.predict(screen_loader)
         eval_screen.eval(screen_logits_N_K_C, y_screen)
 
+        # If this is the second to last cycle, update the batch size, so we end at max_screen_size
         if len(train_idx) + batch_size > max_screen_size:
             batch_size = max_screen_size - len(train_idx)
 
+        # Select the molecules to add for the next cycle
         print("Sample acquisition")
         picks = ACQ.acquire(screen_logits_N_K_C, smiles_screen, hits=hits, n=batch_size)
-
         handler.add(picks)
 
+    # Add all results to a dataframe
     train_results = eval_train.to_dataframe("train_")
     test_results = eval_test.to_dataframe("test_")
     screen_results = eval_screen.to_dataframe('screen_')
