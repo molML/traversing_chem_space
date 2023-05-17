@@ -32,7 +32,7 @@ if __name__ == '__main__':
     PARAMETERS['acquisition'] = [args.acq]
     PARAMETERS['bias'] = [args.bias]
     PARAMETERS['architecture'] = [args.arch]
-    PARAMETERS['batch_size'] = [args.batch_size]
+    PARAMETERS['batch_size'] = [int(args.batch_size)]
     LOG_FILE = f'{args.o}/{args.arch}_{args.acq}_{args.bias}_{args.batch_size}_simulation_results.csv'
 
     # PARAMETERS['acquisition'] = ['random']
