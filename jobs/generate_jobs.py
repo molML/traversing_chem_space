@@ -6,6 +6,7 @@ hours = 120
 
 acquisitions = ['random', 'exploration', 'exploitation', 'dynamic', 'batch_bald', 'similarity']
 biases = ["random", "small", "large"]
+batch_sizes = [64, 32, 16]
 architectures = ["gcn", "mlp"]
 output = 'results'
 
@@ -19,13 +20,14 @@ output = 'results'
 # args = parser.parse_args()
 
 experiment = 0
-for arch in architectures:
-    for acq in acquisitions:
-        for bias in biases:
+for bias in biases:
+    for batch_size in batch_sizes:
+        for arch in architectures:
+            for acq in acquisitions:
 
-            experiment_name = f"{arch}_{acq}_{bias}"
+                experiment_name = f"{arch}_{acq}_{bias}_{batch_size}"
 
-            x = f"""#!/bin/bash
+                x = f"""#!/bin/bash
 #SBATCH --job-name={experiment}_{experiment_name}
 #SBATCH --output=/home/tilborgd/projects/{project_name}/out/{experiment}_{experiment_name}.out
 #SBATCH -p gpu
@@ -36,15 +38,15 @@ for arch in architectures:
 
 source $HOME/anaconda3/etc/profile.d/conda.sh
 export PYTHONPATH="${'PYTHONPATH'}:$HOME/projects/{project_name}"
-$HOME/anaconda3/envs/molml/bin/python -u $HOME/projects/{project_name}/experiments/main.py -o /home/tilborgd/projects/{project_name}/{output} -acq {acq} -bias {bias} -arch {arch} > $HOME/projects/{project_name}/{output}/{experiment_name}.log
+$HOME/anaconda3/envs/molml/bin/python -u $HOME/projects/{project_name}/experiments/main.py -o /home/tilborgd/projects/{project_name}/{output} -acq {acq} -bias {bias} -arch {arch} -batch_size {batch_size} > $HOME/projects/{project_name}/{output}/{experiment_name}.log
 """
 
 
-            filename = f"jobs/{experiment}_{experiment_name}.sh"
+                filename = f"jobs/{experiment}_{experiment_name}.sh"
 
-            # write x to file
-            with open(filename, 'w') as f:
-                f.write(x)
+                # write x to file
+                with open(filename, 'w') as f:
+                    f.write(x)
 
-            experiment += 1
+                experiment += 1
 

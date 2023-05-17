@@ -26,12 +26,14 @@ if __name__ == '__main__':
                                      "'batch_bald', 'similarity')", default='random')
     parser.add_argument('-bias', help='The level of bias ("random", "small", "large")', default='results')
     parser.add_argument('-arch', help='The neural network architecture ("gcn", "mlp")', default='mlp')
+    parser.add_argument('-batch_size', help='How many molecules we select each cycle', default=64)
     args = parser.parse_args()
 
     PARAMETERS['acquisition'] = [args.acq]
     PARAMETERS['bias'] = [args.bias]
     PARAMETERS['architecture'] = [args.arch]
-    LOG_FILE = f'{args.o}/{args.arch}_{args.acq}_{args.bias}_simulation_results.csv'
+    PARAMETERS['batch_size'] = [args.batch_size]
+    LOG_FILE = f'{args.o}/{args.arch}_{args.acq}_{args.bias}_{args.batch_size}_simulation_results.csv'
 
     # PARAMETERS['acquisition'] = ['random']
     # PARAMETERS['bias'] = ['random']
