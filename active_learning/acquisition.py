@@ -138,15 +138,15 @@ def greedy_exploration(logits_N_K_C: Tensor, smiles: np.ndarray[str], n: int = 1
     return np.array([smiles[picks_idx.cpu()]]) if n == 1 else smiles[picks_idx.cpu()]
 
 
-def dynamic_exploration(logits_N_K_C: Tensor, smiles: np.ndarray[str], n: int = 1, lambd: float = 0.9,
+def dynamic_exploration(logits_N_K_C: Tensor, smiles: np.ndarray[str], n: int = 1, lambd: float = 0.95,
                         iteration: int = 0, **kwargs) -> np.ndarray[str]:
     """ starts with 100% exploration, approaches the limit of 100% exploitation. The speed in which we stop
     exploring depends on lambda. For example, a lambda of 0.9 will require 44 iterations to reach full exploitation,
     a lambda of 0.5 will get there in only 7 iterations """
 
-    exploration_factor = ((lambd ** iteration) / 1)
-    n_explore = round(n * exploration_factor)
-    n_exploit = n - n_explore
+    exploitation_factor = (1/(lambd ** iteration)) - 1
+    n_exploit = round(n * exploitation_factor)
+    n_explore = n - n_exploit
 
     exploitative_picks = greedy_exploitation(logits_N_K_C, smiles, n=n_exploit)
     explorative_picks = greedy_exploration(logits_N_K_C, smiles, n=n_explore)
