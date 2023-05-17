@@ -9,4 +9,4 @@
 
 source $HOME/anaconda3/etc/profile.d/conda.sh
 export PYTHONPATH="$PYTHONPATH:$HOME/projects/Active_Learning_Simulation"
-$HOME/anaconda3/envs/molml/bin/python -u $HOME/projects/Active_Learning_Simulation/experiments/active_learning.py -o /home/tilborgd/projects/Active_Learning_Simulation/results -acq batch_bald -bias random -arch gcn > $HOME/projects/Active_Learning_Simulation/results/gcn_batch_bald_random.log
+$HOME/anaconda3/envs/molml/bin/python -u $HOME/projects/Active_Learning_Simulation/experiments/main.py -o /home/tilborgd/projects/Active_Learning_Simulation/results -acq batch_bald -bias random -arch gcn > $HOME/projects/Active_Learning_Simulation/results/gcn_batch_bald_random.log

@@ -9,4 +9,4 @@
 
 source $HOME/anaconda3/etc/profile.d/conda.sh
 export PYTHONPATH="$PYTHONPATH:$HOME/projects/Active_Learning_Simulation"
-$HOME/anaconda3/envs/molml/bin/python -u $HOME/projects/Active_Learning_Simulation/experiments/active_learning.py -o /home/tilborgd/projects/Active_Learning_Simulation/results -acq dynamic -bias large -arch gcn > $HOME/projects/Active_Learning_Simulation/results/gcn_dynamic_large.log
+$HOME/anaconda3/envs/molml/bin/python -u $HOME/projects/Active_Learning_Simulation/experiments/main.py -o /home/tilborgd/projects/Active_Learning_Simulation/results -acq dynamic -bias large -arch gcn > $HOME/projects/Active_Learning_Simulation/results/gcn_dynamic_large.log
