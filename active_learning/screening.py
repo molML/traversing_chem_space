@@ -48,7 +48,6 @@ def active_learning(n_start: int = 64, acquisition_method: str = 'exploration', 
     # Initiate evaluation trackers
     eval_test, eval_screen, eval_train = Evaluate(), Evaluate(), Evaluate()
     handler = Handler(n_start=n_start, seed=seed, bias=bias)
-    ACQ = Acquisition(method=acquisition_method, seed=seed)
 
     # Define some variables
     hits_discovered, total_mols_screened, all_train_smiles = [], [], []
@@ -61,8 +60,14 @@ def active_learning(n_start: int = 64, acquisition_method: str = 'exploration', 
                                       num_workers=NUM_WORKERS,
                                       shuffle=False, pin_memory=True)
 
+    n_cycles = ceil((max_screen_size - n_start) / batch_size)
+    # exploration_factor = 1 / lambd^x. To achieve a factor of 1 at the last cycle: lambd = 1 / nth root of 2
+    lambd = 1 / (2 ** (1/n_cycles))
+
+    ACQ = Acquisition(method=acquisition_method, seed=seed, lambd=lambd)
+
     # While max_screen_size has not been achieved, do some active learning in cycles
-    for cycle in tqdm(range(ceil((max_screen_size - n_start)/batch_size)+1)):
+    for cycle in tqdm(range(n_cycles+1)):
 
         # Get the train and screen data for this cycle
         train_idx, screen_idx = handler()
