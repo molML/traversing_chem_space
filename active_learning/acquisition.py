@@ -163,7 +163,7 @@ def bald(logits_N_K_C: Tensor, smiles: np.ndarray[str], n: int = 1, **kwargs) ->
     return smiles[picks_idx.cpu()]
 
 
-def batch_bald(logits_N_K_C: Tensor, smiles: np.ndarray[str], n: int = 1, num_samples: int = None, **kwargs) -> \
+def batch_bald(logits_N_K_C: Tensor, smiles: np.ndarray[str], n: int = 1, num_samples: int = 1000, **kwargs) -> \
         np.ndarray[str]:
     """ Get BatchBALD batch - Kirch et al., 2019, NeurIPS"""
     if n == 1:
