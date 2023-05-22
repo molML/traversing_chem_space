@@ -4,7 +4,7 @@ project_name = "Active_Learning_Simulation"
 hours = 120
 
 
-acquisitions = ['random', 'exploration', 'exploitation', 'dynamic', 'batch_bald', 'similarity']
+acquisitions = ['random', 'exploration', 'exploitation', 'dynamic', 'bald', 'similarity']
 biases = ["random", "small", "large"]
 batch_sizes = [64, 32, 16]
 architectures = ["gcn", "mlp"]
