@@ -130,10 +130,11 @@ def greedy_exploitation(logits_N_K_C: Tensor, smiles: np.ndarray[str], n: int = 
 
 
 def greedy_exploration(logits_N_K_C: Tensor, smiles: np.ndarray[str], n: int = 1, **kwargs) -> np.ndarray[str]:
-    """ Get the n most uncertain samples """
+    """ Get the n most samples with the most variance in hit classification """
 
-    entropy_mean_N = mean_sample_entropy(logits_N_K_C)
-    picks_idx = torch.argsort(entropy_mean_N, descending=True)[:n]
+    # entropy_mean_N = mean_sample_entropy(logits_N_K_C)
+    sd_mean_N = torch.std(torch.exp(logits_N_K_C), dim=1)[:, 1]
+    picks_idx = torch.argsort(sd_mean_N, descending=True)[:n]
 
     return np.array([smiles[picks_idx.cpu()]]) if n == 1 else smiles[picks_idx.cpu()]
 
