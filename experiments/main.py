@@ -14,7 +14,7 @@ PARAMETERS = {'max_screen_size': [1000],
               'architecture': ['gcn', 'mlp'],
               'seed': list(range(10)),
               'bias': ['random', 'small', 'large'],
-              'acquisition': ['random', 'exploration', 'exploitation', 'dynamic', 'dynamic_bald', 'batch_bald',
+              'acquisition': ['random', 'exploration', 'exploitation', 'dynamic', 'dynamicbald', 'batch_bald',
                               'similarity']
               }
 
