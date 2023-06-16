@@ -12,9 +12,10 @@ PARAMETERS = {'max_screen_size': [1000],
               'n_start': [64],
               'batch_size': [64, 32, 16],
               'architecture': ['gcn', 'mlp'],
-              'seed': list(range(20)),
+              'seed': list(range(10)),
               'bias': ['random', 'small', 'large'],
-              'acquisition': ['random', 'exploration', 'exploitation', 'dynamic', 'batch_bald', 'similarity']
+              'acquisition': ['random', 'exploration', 'exploitation', 'dynamic', 'dynamic_bald', 'batch_bald',
+                              'similarity']
               }
 
 
