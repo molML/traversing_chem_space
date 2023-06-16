@@ -38,6 +38,7 @@ class Acquisition:
                                    'exploration': greedy_exploration,
                                    'exploitation': greedy_exploitation,
                                    'dynamic': dynamic_exploration,
+                                   'dynamic_bald': dynamic_exploration_bald,
                                    'bald': bald,
                                    'batch_bald': batch_bald,
                                    'similarity': similarity_search}
