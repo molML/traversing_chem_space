@@ -4,7 +4,8 @@ from active_learning.data_prep import MasterDataset, load_hdf5
 import numpy as np
 from scipy.cluster import hierarchy
 from collections import Counter
-
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
 
 if __name__ == '__main__':
 
@@ -58,12 +59,31 @@ if __name__ == '__main__':
     for i in cluster_smiles_with_hits:
         print(len(i[0]), len(i[1]), len(i[0]) / len(i[1]))
 
-    len(cluster_smiles_with_hits)   # len = 31
+    only_child = []
+    for i in range(len(cluster_smiles_with_hits)):
+        supercluster = cluster_smiles_with_hits[i][1]
+        subcluster = cluster_smiles_with_hits[i][0]
+
+        contains = 0
+        if len(np.intersect1d(supercluster, subcluster)) > 0:
+            contains = 1
+
+        for j in range(len(cluster_smiles_with_hits)):
+            if i != j and len(np.intersect1d(cluster_smiles_with_hits[j][1], subcluster)) > 0:
+                contains += 1
+
+        only_child.append(contains)
+
+    cluster_smiles_with_hits = cluster_smiles_with_hits[np.where(np.array(only_child) == 1)]
 
     torch.save(cluster_smiles_with_hits, 'data/screen/starting_clusters')
 
+    # only child clusters [0, 2, 4, 6, 7, 8, 9, 10, 13, 15]
+    # new ordering        [0, 1, 2, 3, 4, 5, 6, 7,  8,  9]
 
-#
+
+
+
 # # Ward clustering of scaffold similarity
 #
 # n_super_clusters = 10
