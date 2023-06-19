@@ -141,7 +141,7 @@ def atom_featurizer(mol, structural_feats: bool = True, functional_feats: bool =
 
 def molecular_graph_featurizer(smiles: str, y=None, structural_feats: bool = True, functional_feats: bool = True):
 
-    y = torch.tensor([y]).float()
+    y = torch.tensor([y]).to(torch.long)
 
     mol = Chem.MolFromSmiles(smiles, sanitize=True)
     Chem.AssignStereochemistry(mol, cleanIt=True, force=True)
