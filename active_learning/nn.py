@@ -18,7 +18,7 @@ from torch import Tensor
 from torch.utils.data import DataLoader
 from torch.nn import functional as F
 from copy import deepcopy
-from torch_geometric.nn import GCNConv, global_add_pool, BatchNorm
+from torch_geometric.nn import GCNConv, global_add_pool, BatchNorm, GATConv
 from tqdm.auto import trange
 from active_learning.hyperopt import optimize_hyperparameters
 
@@ -58,7 +58,7 @@ class MLP(torch.nn.Module):
 
 
 class GCN(torch.nn.Module):
-    def __init__(self, in_feats: int = 59, n_hidden: int = 1024, num_conv_layers: int = 3, lr: float = 3e-4,
+    def __init__(self, in_feats: int = 130, n_hidden: int = 1024, num_conv_layers: int = 3, lr: float = 3e-4,
                  epochs: int = 50, n_out: int = 2, n_layers: int = 3, seed: int = 42, anchored: bool = True,
                  l2_lambda: float = 3e-4, weight_decay: float = 0):
 
@@ -116,12 +116,77 @@ class GCN(torch.nn.Module):
         return x
 
 
+class GAT(torch.nn.Module):
+    def __init__(self, in_feats: int = 130, n_hidden: int = 1024, num_conv_layers: int = 3, lr: float = 3e-4,
+                 epochs: int = 50, n_out: int = 2, n_layers: int = 3, seed: int = 42, anchored: bool = True,
+                 l2_lambda: float = 3e-4, weight_decay: float = 0):
+
+        super().__init__()
+        self.seed, self.lr, self.l2_lambda, self.epochs, self.anchored = seed, lr, l2_lambda, epochs, anchored
+        self.weight_decay = weight_decay
+
+        self.atom_embedding = torch.nn.Linear(in_feats, n_hidden)
+
+        self.convs = torch.nn.ModuleList()
+        self.norms = torch.nn.ModuleList()
+        for _ in range(num_conv_layers):
+            self.convs.append(GATConv(n_hidden, n_hidden, add_self_loops=True, negative_slope=0.2,
+                                      heads=8, concat=False))
+            self.norms.append(BatchNorm(n_hidden, allow_single_element=True))
+
+        self.fc = torch.nn.ModuleList()
+        self.fc_norms = torch.nn.ModuleList()
+        for i in range(n_layers):
+            self.fc.append(torch.nn.Linear(n_hidden, n_hidden))
+            self.fc_norms.append(BatchNorm(n_hidden, allow_single_element=True))
+
+        self.out = torch.nn.Linear(n_hidden, n_out)
+
+    def reset_parameters(self):
+        self.atom_embedding.reset_parameters()
+        for conv, norm in zip(self.convs, self.norms):
+            conv.reset_parameters()
+            norm.reset_parameters()
+        for lin, norm in zip(self.fc, self.fc_norms):
+            lin.reset_parameters()
+            norm.reset_parameters()
+        self.out.reset_parameters()
+
+    def forward(self, x: Tensor, edge_index: Tensor, batch: Tensor) -> Tensor:
+        # Atom Embedding:
+        x = F.elu(self.atom_embedding(x))
+
+        # Graph convolutions
+        for conv, norm in zip(self.convs, self.norms):
+            x = conv(x, edge_index)
+            x = norm(x)
+            x = F.relu(x)
+
+        # Perform global pooling by sum pooling
+        x = global_add_pool(x, batch)
+
+        for lin, norm in zip(self.fc, self.fc_norms):
+            x = lin(x)
+            x = norm(x)
+            x = F.relu(x)
+
+        x = self.out(x)
+        x = F.log_softmax(x, 1)
+
+        return x
+
+
 class Model(torch.nn.Module):
     def __init__(self, architecture: str, **kwargs):
         super().__init__()
-        assert architecture in ['gcn', 'mlp']
+        assert architecture in ['gcn', 'mlp', 'gat']
         self.architecture = architecture
-        self.model = MLP(**kwargs) if architecture == 'mlp' else GCN(**kwargs)
+        if architecture == 'mlp':
+            self.model = MLP(**kwargs)
+        elif architecture == 'gcn':
+            self.model = GCN(**kwargs)
+        else:
+            self.model = GAT(**kwargs)
 
         self.device_type = "cuda" if torch.cuda.is_available() else "cpu"
         self.device = torch.device(self.device_type)
@@ -155,7 +220,7 @@ class Model(torch.nn.Module):
 
                 with torch.autocast(device_type=self.device_type, dtype=torch.float16):
 
-                    if self.architecture == 'gcn':
+                    if self.architecture in ['gcn', 'gat']:
                         batch.to(self.device)
                         y = batch.y
                         y_hat = self.model(batch.x.float(), batch.edge_index, batch.batch)
@@ -203,7 +268,7 @@ class Model(torch.nn.Module):
         with torch.no_grad():
             with torch.autocast(device_type=self.device_type, dtype=torch.float16):
                 for batch in dataloader:
-                    if self.architecture == 'gcn':
+                    if self.architecture in ['gcn', 'gat']:
                         batch.to(self.device)
                         y_hat = self.model(batch.x.float(), batch.edge_index, batch.batch)
                     else:
