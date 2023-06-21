@@ -287,7 +287,7 @@ class Model(torch.nn.Module):
 
                 with torch.autocast(device_type=self.device_type, dtype=torch.float16):
 
-                    if self.architecture in ['gcn', 'gat']:
+                    if self.architecture in ['gcn', 'gat', 'gin']:
                         batch.to(self.device)
                         y = batch.y
                         y_hat = self.model(batch.x.float(), batch.edge_index, batch.batch)
@@ -335,7 +335,7 @@ class Model(torch.nn.Module):
         with torch.no_grad():
             with torch.autocast(device_type=self.device_type, dtype=torch.float16):
                 for batch in dataloader:
-                    if self.architecture in ['gcn', 'gat']:
+                    if self.architecture in ['gcn', 'gat', 'gin']:
                         batch.to(self.device)
                         y_hat = self.model(batch.x.float(), batch.edge_index, batch.batch)
                     else:
