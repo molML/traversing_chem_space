@@ -58,8 +58,8 @@ class MLP(torch.nn.Module):
 
 
 class GCN(torch.nn.Module):
-    def __init__(self, in_feats: int = 130, n_hidden: int = 1024, num_conv_layers: int = 3, lr: float = 3e-4,
-                 epochs: int = 50, n_out: int = 2, n_layers: int = 5, seed: int = 42, anchored: bool = True,
+    def __init__(self, in_feats: int = 130, n_hidden: int = 1024, num_conv_layers: int = 5, lr: float = 3e-4,
+                 epochs: int = 50, n_out: int = 2, n_layers: int = 3, seed: int = 42, anchored: bool = True,
                  l2_lambda: float = 3e-4, weight_decay: float = 0):
 
         super().__init__()
