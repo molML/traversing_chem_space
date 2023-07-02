@@ -1,7 +1,7 @@
 
 
 project_name = "Active_Learning_Simulation"
-hours = 120
+hours = 60
 
 
 acquisitions = ['random', 'exploration', 'exploitation', 'bald', 'similarity', 'exploitation_nolearn']  #  'dynamic'
