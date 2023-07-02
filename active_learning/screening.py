@@ -26,7 +26,8 @@ NUM_WORKERS = 4
 
 def active_learning(n_start: int = 64, acquisition_method: str = 'exploration', max_screen_size: int = None,
                     batch_size: int = 16, architecture: str = 'gcn', seed: int = 0, bias: str = 'random',
-                    optimize_hyperparameters: bool = False, ensemble_size: int = 10) -> pd.DataFrame:
+                    optimize_hyperparameters: bool = False, ensemble_size: int = 10, retrain: bool = True) -> \
+        pd.DataFrame:
     """
     :param n_start: number of molecules to start out with
     :param acquisition_method: acquisition method, as defined in active_learning.acquisition
@@ -107,10 +108,11 @@ def active_learning(n_start: int = 64, acquisition_method: str = 'exploration', 
 
         # Initiate and train the model (optimize if specified)
         print("Training model")
-        M = Ensemble(seed=seed, ensemble_size=ensemble_size, architecture=architecture)
-        if cycle == 0 and optimize_hyperparameters:
-            M.optimize_hyperparameters(x_train, y_train)
-        M.train(train_loader_balanced, verbose=False)
+        if retrain or cycle == 0:
+            M = Ensemble(seed=seed, ensemble_size=ensemble_size, architecture=architecture)
+            if cycle == 0 and optimize_hyperparameters:
+                M.optimize_hyperparameters(x_train, y_train)
+            M.train(train_loader_balanced, verbose=False)
 
         # Do inference of the train/test/screen data
         print("Train/test/screen inference")
