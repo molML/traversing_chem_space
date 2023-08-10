@@ -26,10 +26,16 @@ if __name__ == '__main__':
 
     OUT_DIR = args.o
 
-    D = load_hdf5(f'{OUT_DIR}/tanimoto_distance_vector')
+    for dataset in ['PKM2', 'VDR', 'ALDH1']:  # , 'ALDH1'
 
-    Z = hierarchy.average(D)
+        D = load_hdf5(f'{OUT_DIR}/tanimoto_distance_vector_{dataset}')
 
-    torch.save(Z, f'{OUT_DIR}/average_linkage_clustering', pickle_protocol=5)
+        Z = hierarchy.average(D)
 
-    # / home / tilborgd / projects / random
+        del D
+
+        torch.save(Z, f'{OUT_DIR}/average_linkage_clustering_{dataset}', pickle_protocol=5)
+
+        del Z
+
+        # / home / tilborgd / projects / random
