@@ -16,15 +16,16 @@ from config import ROOT_DIR
 
 
 class Handler:
-    def __init__(self, n_start: int = 64, bias: str = 'random', seed: int = 42) -> None:
+    def __init__(self, n_start: int = 64, bias: str = 'random', seed: int = 42, dataset: str = 'ALDH1') -> None:
 
         assert bias in ['random', 'small', 'large'], "'bias' has to be either 'random', 'small', or 'large'"
         assert n_start <= 64 or bias == 'random', 'Number of starting molecules has to be <= 64'
 
-        self.index_smiles = torch.load(os.path.join(ROOT_DIR, 'data', 'screen', 'index_smiles'))
-        self.smiles_index = torch.load(os.path.join(ROOT_DIR, 'data', 'screen', 'smiles_index'))
-        self.all_y = torch.load(os.path.join(ROOT_DIR, 'data', 'screen', 'y'))
+        self.index_smiles = torch.load(os.path.join(ROOT_DIR, 'data', dataset, 'screen', 'index_smiles'))
+        self.smiles_index = torch.load(os.path.join(ROOT_DIR, 'data', dataset, 'screen', 'smiles_index'))
+        self.all_y = torch.load(os.path.join(ROOT_DIR, 'data', dataset, 'screen', 'y'))
 
+        self.dataset = dataset
         self.selected_start_cluster = None
         self.train_idx, self.screen_idx = self.get_start_data(n_start=n_start, bias=bias, seed=seed)
         self.picks = [self.train_idx]
@@ -32,7 +33,7 @@ class Handler:
     def get_start_data(self, n_start: int = 64, bias: str = 'random', seed: int = 0) -> (np.ndarray, np.ndarray):
 
         rng = np.random.default_rng(seed=seed)
-        starting_clusters = torch.load(os.path.join(ROOT_DIR, 'data/screen/starting_clusters'))
+        starting_clusters = torch.load(os.path.join(ROOT_DIR, f'data/{self.dataset}/screen/starting_clusters'))
         n_clusters = len(starting_clusters)
         self.selected_start_cluster = seed if seed <= n_clusters else rng.integers(0, n_clusters)
 
