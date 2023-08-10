@@ -29,11 +29,11 @@ for dataset in datasets:
             else:
 
                 if batch_size == 64:
-                    hours = 60
+                    hours = 16
                 elif batch_size == 32:
                     hours = 30
                 else:
-                    hours = 16
+                    hours = 60
 
                 for arch in architectures:
                     for acq in acquisitions:

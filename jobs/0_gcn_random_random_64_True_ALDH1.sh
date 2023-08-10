@@ -5,7 +5,7 @@
 #SBATCH -N 1
 #SBATCH --ntasks=18
 #SBATCH --gpus-per-node=1
-#SBATCH --time=60:00:00
+#SBATCH --time=16:00:00
 
 source $HOME/anaconda3/etc/profile.d/conda.sh
 export PYTHONPATH="$PYTHONPATH:$HOME/projects/Active_Learning_Simulation"
