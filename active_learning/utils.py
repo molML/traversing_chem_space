@@ -139,6 +139,22 @@ def atom_featurizer(mol, structural_feats: bool = True, functional_feats: bool =
     return x
 
 
+def check_featurizability(smiles: str):
+    try:
+        mol = Chem.MolFromSmiles(smiles, sanitize=True)
+        Chem.AssignStereochemistry(mol, cleanIt=True, force=True)
+
+        for atom in mol.GetAtoms():
+            try:
+                x_ = atom_props(atom)
+            except:
+                return False
+    except:
+        return False
+
+    return True
+
+
 def molecular_graph_featurizer(smiles: str, y=None, structural_feats: bool = True, functional_feats: bool = True):
 
     y = torch.tensor([y]).to(torch.long)
