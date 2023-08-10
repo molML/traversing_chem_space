@@ -26,8 +26,8 @@ NUM_WORKERS = 4
 
 def active_learning(n_start: int = 64, acquisition_method: str = 'exploration', max_screen_size: int = None,
                     batch_size: int = 16, architecture: str = 'gcn', seed: int = 0, bias: str = 'random',
-                    optimize_hyperparameters: bool = False, ensemble_size: int = 10, retrain: bool = True) -> \
-        pd.DataFrame:
+                    optimize_hyperparameters: bool = False, ensemble_size: int = 10, retrain: bool = True,
+                    anchored: bool = True, dataset: str = 'ALDH1') -> pd.DataFrame:
     """
     :param n_start: number of molecules to start out with
     :param acquisition_method: acquisition method, as defined in active_learning.acquisition
@@ -43,12 +43,12 @@ def active_learning(n_start: int = 64, acquisition_method: str = 'exploration', 
 
     # Load the datasets
     representation = 'ecfp' if architecture == 'mlp' else 'graph'
-    ds_screen = MasterDataset('screen', representation=representation)
-    ds_test = MasterDataset('test', representation=representation)
+    ds_screen = MasterDataset('screen', representation=representation, dataset=dataset)
+    ds_test = MasterDataset('test', representation=representation, dataset=dataset)
 
     # Initiate evaluation trackers
     eval_test, eval_screen, eval_train = Evaluate(), Evaluate(), Evaluate()
-    handler = Handler(n_start=n_start, seed=seed, bias=bias)
+    handler = Handler(n_start=n_start, seed=seed, bias=bias, dataset=dataset)
 
     # Define some variables
     hits_discovered, total_mols_screened, all_train_smiles = [], [], []
@@ -109,7 +109,7 @@ def active_learning(n_start: int = 64, acquisition_method: str = 'exploration', 
         # Initiate and train the model (optimize if specified)
         print("Training model")
         if retrain or cycle == 0:
-            M = Ensemble(seed=seed, ensemble_size=ensemble_size, architecture=architecture)
+            M = Ensemble(seed=seed, ensemble_size=ensemble_size, architecture=architecture, anchored=anchored)
             if cycle == 0 and optimize_hyperparameters:
                 M.optimize_hyperparameters(x_train, y_train)
             M.train(train_loader_balanced, verbose=False)
