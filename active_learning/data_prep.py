@@ -1,7 +1,7 @@
 
 
 from active_learning.utils import molecular_graph_featurizer as smiles_to_graph
-from active_learning.utils import smiles_to_ecfp, get_tanimoto_matrix
+from active_learning.utils import smiles_to_ecfp, get_tanimoto_matrix, check_featurizability
 import pandas as pd
 import numpy as np
 import torch
@@ -20,12 +20,12 @@ def canonicalize(smiles: str, sanitize: bool = True):
     return Chem.MolToSmiles(Chem.MolFromSmiles(smiles, sanitize=sanitize))
 
 
-def get_data(random_state: int = 42):
+def get_data(random_state: int = 42, dataset: str = 'ALDH1'):
 
     # read smiles from file and canonicalize them
-    with open(os.path.join(ROOT_DIR, 'data/original/inactives.smi')) as f:
+    with open(os.path.join(ROOT_DIR, f'data/{dataset}/original/inactives.smi')) as f:
         inactives = [canonicalize(smi.strip().split()[0]) for smi in f.readlines()]
-    with open(os.path.join(ROOT_DIR, 'data/original/actives.smi')) as f:
+    with open(os.path.join(ROOT_DIR, f'data/{dataset}/original/actives.smi')) as f:
         actives = [canonicalize(smi.strip().split()[0]) for smi in f.readlines()]
 
     # remove duplicates:
@@ -37,18 +37,20 @@ def get_data(random_state: int = 42):
     inactives = [smi for smi in inactives if smi not in intersecting_mols]
     actives = [smi for smi in actives if smi not in intersecting_mols]
 
-    # remove molecules that have scaffolds that cannot be kekulized
+    # remove molecules that have scaffolds that cannot be kekulized or featurized
     inactives_, actives_ = [], []
     for smi in tqdm(actives):
         try:
             if Chem.MolFromSmiles(smi_to_scaff(smi, includeChirality=False)) is not None:
-                actives_.append(smi)
+                if check_featurizability(smi):
+                    actives_.append(smi)
         except:
             pass
     for smi in tqdm(inactives):
         try:
             if Chem.MolFromSmiles(smi_to_scaff(smi, includeChirality=False)) is not None:
-                inactives_.append(smi)
+                if check_featurizability(smi):
+                    inactives_.append(smi)
         except:
             pass
 
@@ -62,33 +64,33 @@ def get_data(random_state: int = 42):
     return df
 
 
-def split_data(df: pd.DataFrame, random_state: int = 42, screen_size: int = 50000, test_size: int = 10000) -> \
-        (pd.DataFrame, pd.DataFrame):
+def split_data(df: pd.DataFrame, random_state: int = 42, screen_size: int = 50000, test_size: int = 10000,
+               dataset: str = 'ALDH1') -> (pd.DataFrame, pd.DataFrame):
 
     from sklearn.model_selection import train_test_split
     df_screen, df_test = train_test_split(df, stratify=df['y'].tolist(), train_size=screen_size, test_size=test_size,
                                           random_state=random_state)
 
     # write to csv
-    df_screen.to_csv(os.path.join(ROOT_DIR, 'data/original/screen.csv'), index=False)
-    df_test.to_csv(os.path.join(ROOT_DIR, 'data/original/test.csv'), index=False)
+    df_screen.to_csv(os.path.join(ROOT_DIR, f'data/{dataset}/original/screen.csv'), index=False)
+    df_test.to_csv(os.path.join(ROOT_DIR, f'data/{dataset}/original/test.csv'), index=False)
 
     return df_screen, df_test
 
 
 class MasterDataset:
     """ Dataset that holds all data in an indexable way """
-    def __init__(self, name: str, df: pd.DataFrame = None, representation: str = 'ecfp', root: str = 'data',
+    def __init__(self, name: str, df: pd.DataFrame = None, dataset: str = 'ALDH1', representation: str = 'ecfp', root: str = 'data',
                  overwrite: bool = False) -> None:
 
         assert representation in ['ecfp', 'graph'], f"'representation' must be 'ecfp' or 'graph', not {representation}"
         self.representation = representation
-        self.pth = os.path.join(ROOT_DIR, root, name)
+        self.pth = os.path.join(ROOT_DIR, root, dataset, name)
 
         # If not done already, process all data. Else just load it
         if not os.path.exists(self.pth) or overwrite:
             assert df is not None, "You need to supply a dataframe with 'smiles' and 'y' values"
-            os.makedirs(os.path.join(root, name), exist_ok=True)
+            os.makedirs(os.path.join(root, dataset, name), exist_ok=True)
             self.process(df)
             self.smiles_index, self.index_smiles, self.smiles, self.x, self.y, self.graphs = self.load()
         else:
@@ -100,10 +102,10 @@ class MasterDataset:
 
         index_smiles = OrderedDict({i: smi for i, smi in enumerate(df.smiles)})
         smiles_index = OrderedDict({smi: i for i, smi in enumerate(df.smiles)})
-        smiles = np.array(df.smiles)
-        x = smiles_to_ecfp(df.smiles, silent=False)
-        y = np.array(df.y)
-        graphs = [smiles_to_graph(smi, y=y.type(torch.LongTensor)) for smi, y in tqdm(zip(df.smiles, df.y))]
+        smiles = np.array(df.smiles.tolist())
+        x = smiles_to_ecfp(smiles, silent=False)
+        y = torch.tensor(df.y.tolist())
+        graphs = [smiles_to_graph(smi, y=y.type(torch.LongTensor)) for smi, y in tqdm(zip(smiles, y))]
 
         torch.save(index_smiles, os.path.join(self.pth, 'index_smiles'))
         torch.save(smiles_index, os.path.join(self.pth, 'smiles_index'))
@@ -144,16 +146,16 @@ def smi_to_scaff(smiles: str, includeChirality: bool = False):
     return MurckoScaffold.MurckoScaffoldSmiles(mol=Chem.MolFromSmiles(smiles), includeChirality=includeChirality)
 
 
-def similarity_vectors(df_screen, df_test, root: str = 'data'):
+def similarity_vectors(df_screen, df_test, root: str = 'data', dataset: str = 'ALDH1'):
 
     print("Computing Tanimoto matrix for all test molecules")
     S = get_tanimoto_matrix(df_test['smiles'].tolist(), verbose=True, scaffolds=False, zero_diag=True, as_vector=True)
-    save_hdf5(1-S, f'{ROOT_DIR}/{root}/test/tanimoto_distance_vector')
+    save_hdf5(1-S, f'{ROOT_DIR}/{root}/{dataset}/test/tanimoto_distance_vector')
     del S
 
     print("Computing Tanimoto matrix for all screen molecules")
     S = get_tanimoto_matrix(df_screen['smiles'].tolist(), verbose=True, scaffolds=False, zero_diag=True, as_vector=True)
-    save_hdf5(1 - S, f'{ROOT_DIR}/{root}/screen/tanimoto_distance_vector')
+    save_hdf5(1 - S, f'{ROOT_DIR}/{root}/{dataset}/screen/tanimoto_distance_vector')
     del S
 
 
@@ -175,16 +177,16 @@ def load_hdf5(filename: str) -> Any:
 
 if __name__ == '__main__':
 
-    df = get_data()
-    df_screen, df_test = split_data(df, screen_size=100000, test_size=20000)
+    for dataset in ['ALDH1', 'PKM2', 'VDR']:
 
-    MasterDataset('screen', df_screen, overwrite=True)
-    MasterDataset('test', df_test, overwrite=True)
+        df = get_data(dataset=dataset)
+        df_screen, df_test = split_data(df, screen_size=100000, test_size=20000, dataset=dataset)
 
-    df_screen = pd.read_csv(os.path.join(ROOT_DIR, 'data/original/screen.csv'))
-    df_test = pd.read_csv(os.path.join(ROOT_DIR, 'data/original/test.csv'))
+        MasterDataset(name='screen', df=df_screen, overwrite=True, dataset=dataset)
+        MasterDataset(name='test', df=df_test, overwrite=True, dataset=dataset)
 
-    similarity_vectors(df_screen, df_test)
+        df_screen = pd.read_csv(os.path.join(ROOT_DIR, f'data/{dataset}/original/screen.csv'))
+        df_test = pd.read_csv(os.path.join(ROOT_DIR, f'data/{dataset}/original/test.csv'))
 
-
+        similarity_vectors(df_screen, df_test, dataset=dataset)
 

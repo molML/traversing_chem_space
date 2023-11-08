@@ -12,6 +12,7 @@ PARAMETERS = {'max_screen_size': [1000],
               'n_start': [64],
               'batch_size': [64, 32, 16],
               'architecture': ['gcn', 'mlp'],
+              'dataset': ['ALDH1', 'PKM2', 'VDR'],
               'seed': list(range(10)),
               'bias': ['random', 'small', 'large'],
               'acquisition': ['random', 'exploration', 'exploitation', 'dynamic', 'dynamicbald', 'batch_bald',
@@ -27,15 +28,19 @@ if __name__ == '__main__':
                                      "'batch_bald', 'similarity')", default='random')
     parser.add_argument('-bias', help='The level of bias ("random", "small", "large")', default='results')
     parser.add_argument('-arch', help='The neural network architecture ("gcn", "mlp")', default='mlp')
-    parser.add_argument('-retrain', help='retrain the model every cycle', default='True')
+    parser.add_argument('-dataset', help='The dataset ("ALDH1", "PKM2", "VDR")', default='ALDH1')
+    parser.add_argument('-retrain', help='Retrain the model every cycle', default='True')
     parser.add_argument('-batch_size', help='How many molecules we select each cycle', default=64)
+    parser.add_argument('-anchored', help='Anchor the weights', default='True')
     args = parser.parse_args()
 
     PARAMETERS['acquisition'] = [args.acq]
     PARAMETERS['bias'] = [args.bias]
+    PARAMETERS['dataset'] = [args.dataset]
     PARAMETERS['retrain'] = [eval(args.retrain)]
     PARAMETERS['architecture'] = [args.arch]
     PARAMETERS['batch_size'] = [int(args.batch_size)]
+    PARAMETERS['anchored'] = [eval(args.anchored)]
     # LOG_FILE = f'{args.o}/{args.arch}_{args.acq}_{args.bias}_{args.batch_size}_simulation_results.csv'
     LOG_FILE = args.o
 
@@ -56,6 +61,8 @@ if __name__ == '__main__':
                                   architecture=experiment['architecture'],
                                   seed=experiment['seed'],
                                   retrain=experiment['retrain'],
+                                  anchored=experiment['anchored'],
+                                  dataset=experiment['dataset'],
                                   optimize_hyperparameters=False)
 
         # Add the experimental settings to the outfile
@@ -66,5 +73,6 @@ if __name__ == '__main__':
         results['seed'] = experiment['seed']
         results['bias'] = experiment['bias']
         results['retrain'] = experiment['retrain']
+        results['dataset'] = experiment['dataset']
 
         results.to_csv(LOG_FILE, mode='a', index=False, header=False if os.path.isfile(LOG_FILE) else True)
