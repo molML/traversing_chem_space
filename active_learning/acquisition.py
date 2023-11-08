@@ -4,19 +4,6 @@ This script contains a selection of sample acquisition methods for active learni
 All functions here operate on model predictions in the form of logits_N_K_C = [N, num_inference_samples, num_classes].
 Here N is a molecule, K are the number of sampled predictions (i.e., 10 for a 10-model ensemble), and C = 2 ([0, 1]):
 
-    - Acquisition: class that handles all molecule acquisition
-    - logits_to_pred: Get the probabilities/class vector and sample uncertainty from logits
-    - logits_mean: Get the logit mean with the logsumexp trick
-    - entropy: Calculates the Shannon Entropy on the logits
-    - mean_sample_entropy: Calculates the mean entropy for each sample given multiple ensemble predictions
-    - mutual_information: Calculates the Mutual Information
-    - greedy_exploitation: Get the n highest predicted samples
-    - greedy_exploration: Get the n most uncertain samples (based on entropy)
-    - dynamic_exploration: Gradually move from greedy exploration to greedy exploitation
-    - bald: Get the n molecules with the lowest Mutual Information - Houlsby et al., 2011
-    - batch_bald: Get BatchBALD batch - Kirch et al., 2019, NeurIPS
-    - similarity_search: Perform similarity search, take the n screen mols with the highest similarity to any hit
-
     Author: Derek van Tilborg, Eindhoven University of Technology, May 2023
 
 """

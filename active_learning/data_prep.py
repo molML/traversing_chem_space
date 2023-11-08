@@ -190,4 +190,3 @@ if __name__ == '__main__':
 
         similarity_vectors(df_screen, df_test, dataset=dataset)
 
-# 8_mlp_exploitation_random_64_True.out
