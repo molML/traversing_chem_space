@@ -27,7 +27,7 @@ diversity in the starting set. These results advocate for the adoption of active
 in low-data regimes.
 
 
-![Figure 1](figures/figure1.png)
+![Figure 1](figures/Fig1.png)
 
 
 <!-- How to cite-->
