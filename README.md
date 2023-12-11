@@ -29,6 +29,32 @@ in low-data regimes.
 
 ![Figure 1](figures/Fig1.png)
 
+ 
+## Description
+This repository contains all code to replicate our study. Feel free to try out anything you find here.
+
+## Modules
+- `data_prep.py`: Processes active and inactive compound data.
+- `clustering.py`: Clusters compounds for sampling diversity.
+- `nn.py`: Contains neural network models (MLP, GCN, etc.).
+- `screening.py`: Core script for active learning cycles.
+- `utils.py`: Utility functions for data handling and evaluation.
+- `main.py`: Entry point for running experiments with customizable parameters.
+ 
+## Usage
+Run `python main.py` with desired command-line arguments to start the active learning process. Ensure necessary data files (active and inactive `.smi`) are present.
+ 
+## Requirements
+Install dependencies from the provided env.yaml file.
+
+```conda env create -f env.yaml```
+
+This codebase uses Python 3.9 and depends on:
+- [PyTorch](https://pytorch.org/) (2.0.1)
+- [PyTorch Geometric](https://pytorch-geometric.readthedocs.io/en/latest/) (2.3.1)
+- [RDKit](https://www.rdkit.org/) (2023.3.2)
+- [Scikit-learn](https://scikit-learn.org/) (1.3.0)
+
 
 <!-- How to cite-->
 <h2 id="How-to-cite">How to cite</h2>
