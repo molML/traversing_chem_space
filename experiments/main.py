@@ -31,6 +31,7 @@ if __name__ == '__main__':
     parser.add_argument('-dataset', help='The dataset ("ALDH1", "PKM2", "VDR")', default='ALDH1')
     parser.add_argument('-retrain', help='Retrain the model every cycle', default='True')
     parser.add_argument('-batch_size', help='How many molecules we select each cycle', default=64)
+    parser.add_argument('-n_start', help='How many molecules we have in our starting set (min=2)', default=64)
     parser.add_argument('-anchored', help='Anchor the weights', default='True')
     args = parser.parse_args()
 
@@ -40,6 +41,7 @@ if __name__ == '__main__':
     PARAMETERS['retrain'] = [eval(args.retrain)]
     PARAMETERS['architecture'] = [args.arch]
     PARAMETERS['batch_size'] = [int(args.batch_size)]
+    PARAMETERS['n_start'] = [int(args.n_start)]
     PARAMETERS['anchored'] = [eval(args.anchored)]
     # LOG_FILE = f'{args.o}/{args.arch}_{args.acq}_{args.bias}_{args.batch_size}_simulation_results.csv'
     LOG_FILE = args.o
