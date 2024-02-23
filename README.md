@@ -62,7 +62,7 @@ You can currently cite our preprint
 
 Traversing Chemical Space with Active Deep Learning. Derek van Tilborg and Francesca Grisoni.
 ChemRxiv, 2023.
-DOI: https://doi.org/10.26434/chemrxiv-2023-wgl32
+DOI: https://doi.org/10.26434/chemrxiv-2023-wgl32-v3
 
 
 <!-- License-->
