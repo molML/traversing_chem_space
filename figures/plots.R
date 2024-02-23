@@ -53,13 +53,18 @@ default_plot_theme_legend = theme(
 se <- function(x, na.rm = FALSE) {sd(x, na.rm=na.rm) / sqrt(sum(1*(!is.na(x))))}
 zip <- function(...) {mapply(list, ..., SIMPLIFY = FALSE)}
 
+wd = "/Users/derekvantilborg/Dropbox/PycharmProjects/traversing_chemical_space"
+setwd(wd)
+
 # compute scaffold stuff in Python
-df <- read_csv("Dropbox/PycharmProjects/Active_Learning_Simulation/processed_results_nosmiles.csv")
+df <- read_csv("processed_results_nosmiles.csv")
+df = subset(df, n_start <= 64)
 
 df$seed = factor(df$seed, levels=unique(df$seed))
 df$bias = stringr::str_to_title(gsub('random', 'innate', df$bias))
 df$bias = factor(df$bias, levels=c('Innate', 'Small', 'Large'))
 df$batch_size = factor(df$batch_size, levels=c(16, 32, 64))
+df$n_start = factor(df$n_start, levels=c(2, 4, 8, 16, 32, 64))
 df[df$retrain == "FALSE", ]$acquisition_method = 'Exploit, no retraining'
 df$acquisition_method = gsub('bald', 'BALD (least mutual information)', df$acquisition_method)
 df$acquisition_method = gsub('exploitation', 'Exploit (best predictions)', df$acquisition_method)
@@ -70,6 +75,11 @@ df$acquisition_method = gsub('similarity', 'Similarity', df$acquisition_method)
 #### colours ####
 
 custom_colours = c("#005f73", "#94d2bd", "#0a9396", "#ee9b00", "#bbbbbb", "#f8cd48")
+# custom_colours = c("#005f73", "#6f9cbc", "#6d7889", "#ee9b00", "#bbbbbb", "#f8cd48")
+
+# custom_colours = c("#6f9cbc", "#005f73", "#ee9b00", "#73a563", "#bbbbbb", "#f8cd48")
+# custom_colours = c("#73a563", "#005f73", "#6f9cbc", "#ee9b00", "#bbbbbb", "#f8cd48")
+
 acq_funcs = c("BALD (least mutual information)", 
               "Exploit (best predictions)", 
               "Exploit, no retraining", 
@@ -78,9 +88,10 @@ acq_funcs = c("BALD (least mutual information)",
               "Similarity")
 acq_cols = list(custom_colours, acq_funcs)
 
+
 #### Fig 2: acq function ####
 
-df2 = subset(df, train_cycle >= 0 & batch_size == 64 & bias == 'Innate')
+df2 = subset(df, train_cycle >= 0 & batch_size == 64 & bias == 'Innate' & n_start == 64)
 
 df2 = df2 %>%
   group_by(acquisition_method, bias, dataset, total_mols_screened, train_cycle, architecture) %>%
@@ -157,6 +168,8 @@ fig2f = ggplot(subset(df2, dataset == 'VDR' & architecture == 'gcn'), aes(x = to
   scale_linetype_manual(values=c("dashed"))+
   default_plot_theme + theme(plot.margin = unit(c(-0.25, 0.25, 0.5, 0.25), "cm"))
 
+# "#005f73" "#6f9cbc" "#6d7889" "#ee9b00" "#bbbbbb" "#f8cd48"
+
 
 fig2 = plot_grid(fig2a, fig2b, 
                  fig2c, fig2d,
@@ -173,7 +186,7 @@ dev.print(pdf, 'al_v2_fig2.pdf', width = 88/25.4, height = 123/25.4)
 
 ###### Ridge plots ######
 
-df_ridge_long <- read_csv("Dropbox/PycharmProjects/Active_Learning_Simulation/df_ridge_long.csv")
+df_ridge_long <- read_csv("df_ridge_long.csv")
 
 df_ridge = subset(df_ridge_long, dataset == 'ALDH1' & hit == 1)
 df_ridge$train_cycle = factor(df_ridge$train_cycle, levels=unique(df_ridge$train_cycle))
@@ -206,11 +219,11 @@ fig3b = ggplot(subset(df__, seed == 2 )) +
 
 ###### Line plots #####
 
-pattern_occurence <- read_csv("Dropbox/PycharmProjects/Active_Learning_Simulation/pattern_occurence_ALDH1.csv", 
+pattern_occurence <- read_csv("pattern_occurence_ALDH1.csv", 
                               col_types = cols(...1 = col_skip(), index = col_skip()))
 pattern_occurence$total_patterns = pattern_occurence$hit_patterns + pattern_occurence$nonhit_patterns
 
-dfx = subset(df, train_cycle >= 0 & batch_size == 64 & bias == 'Innate' & architecture == 'mlp' & dataset == 'ALDH1')
+dfx = subset(df, train_cycle >= 0 & batch_size == 64 & bias == 'Innate' & architecture == 'mlp' & dataset == 'ALDH1' & n_start == 64)
 
 margins_c = unit(c(0.25, 0.25, 0, 0.25), "cm")
 margins_d = unit(c(0.25, 0.25, 0, 0), "cm")
@@ -409,8 +422,8 @@ dev.print(pdf, 'al_v2_fig3_.pdf', width = 180/25.4, height = 123/25.4)
 
 #### Fig 4: bias ####
 
-df4abcd = subset(df,  batch_size == 64 & architecture == 'mlp' & dataset == 'ALDH1') # train_cycle >= 0 &
-df4abcd = subset(df,  batch_size == 64 & dataset == 'ALDH1') # train_cycle >= 0 &
+df4abcd = subset(df,  batch_size == 64 & architecture == 'mlp' & dataset == 'ALDH1' & n_start == 64) # train_cycle >= 0 &
+df4abcd = subset(df,  batch_size == 64 & dataset == 'ALDH1' & n_start == 64) # train_cycle >= 0 &
 
 df4abcd = df4abcd %>%
   group_by(acquisition_method, bias, total_mols_screened, train_cycle, architecture) %>%
@@ -481,6 +494,290 @@ dev.print(pdf, 'al_v2_fig4_v2.pdf', width = 88/25.4, height = 82/25.4)
 
 
 
+#### Fig 5: start size ####
+
+
+df5 = subset(df, total_mols_screened == 1000 & batch_size == 64 & bias == 'Innate')
+df5 = subset(df5, acquisition_method %in% c("Random", "Similarity", "BALD (least mutual information)"))
+
+df5 = df5 %>%
+  group_by(acquisition_method, n_start, dataset, total_mols_screened, train_cycle, architecture) %>%
+  summarise(across(c("hits_discovered", "test_tpr", 'test_roc_auc', 
+                     'test_balanced_accuracy', 'enrichment'), 
+                   list(mean = mean, sd = sd, se = se))) %>% ungroup()
+
+
+fig5a = ggplot(subset(df5, dataset == 'PKM2' & architecture == 'mlp'), aes(x = n_start, y=enrichment_mean, color=acquisition_method, fill=acquisition_method, linetype=architecture, group=acquisition_method))+
+  geom_pointrange(aes(ymin=enrichment_mean-enrichment_se, ymax=enrichment_mean+enrichment_se), size = 0, linewidth=0.75, alpha=0.5) + 
+  geom_point(size=1) +
+  labs(y = 'Mean enrichment in\n1000 acquired molecules', x='', color = 'Method', fill = 'Method')+
+  scale_color_manual(values=c("#005f73", "#bbbbbb", "#f8cd48")) +
+  scale_fill_manual(values=c("#005f73", "#bbbbbb", "#f8cd48")) +
+  coord_cartesian(xlim = c(0.5, 6), ylim = c(0, 6), expand=F) +
+  scale_y_continuous(breaks = seq(0,6, by=1)) +
+  default_plot_theme + theme(plot.margin = unit(c(0.25, 0, 0, 0.25), "cm"))
+# u r b l
+fig5b = ggplot(subset(df5, dataset == 'PKM2' & architecture == 'gcn'), aes(x = n_start, y=enrichment_mean, color=acquisition_method, fill=acquisition_method, linetype=architecture, group=acquisition_method))+
+  geom_pointrange(aes(ymin=enrichment_mean-enrichment_se, ymax=enrichment_mean+enrichment_se), size = 0, linewidth=0.75, alpha=0.5) + 
+  geom_point(size=1) +
+  labs(y = '', x='', color = 'Method', fill = 'Method')+
+  scale_color_manual(values=c("#005f73", "#bbbbbb", "#f8cd48")) +
+  scale_fill_manual(values=c("#005f73", "#bbbbbb", "#f8cd48")) +
+  coord_cartesian(xlim = c(0.5, 6), ylim = c(0, 6), expand=F) +
+  scale_y_continuous(breaks = seq(0,6, by=1)) +
+  default_plot_theme + theme(plot.margin = unit(c(0.25, 0.25, 0, 0.25), "cm"))
+
+fig5c = ggplot(subset(df5, dataset == 'ALDH1' & architecture == 'mlp'), aes(x = n_start, y=enrichment_mean, color=acquisition_method, fill=acquisition_method, linetype=architecture, group=acquisition_method))+
+  geom_pointrange(aes(ymin=enrichment_mean-enrichment_se, ymax=enrichment_mean+enrichment_se), size = 0, linewidth=0.75, alpha=0.5) + 
+  geom_point(size=1) +
+  labs(y = 'Mean enrichment in\n1000 acquired molecules', x='', color = 'Method', fill = 'Method')+
+  scale_color_manual(values=c("#005f73", "#bbbbbb", "#f8cd48")) +
+  scale_fill_manual(values=c("#005f73", "#bbbbbb", "#f8cd48")) +
+  coord_cartesian(xlim = c(0.5, 6), ylim = c(0, 6), expand=F) +
+  scale_y_continuous(breaks = seq(0,6, by=1)) +
+  default_plot_theme + theme(plot.margin = unit(c(0, 0, 0.25, 0.25), "cm"))
+
+fig5d = ggplot(subset(df5, dataset == 'ALDH1' & architecture == 'gcn'), aes(x = n_start, y=enrichment_mean, color=acquisition_method, fill=acquisition_method, linetype=architecture, group=acquisition_method))+
+  geom_pointrange(aes(ymin=enrichment_mean-enrichment_se, ymax=enrichment_mean+enrichment_se), size = 0, linewidth=0.75, alpha=0.5) + 
+  geom_point(size=1) +
+  labs(y = '', x='', color = 'Method', fill = 'Method')+
+  scale_color_manual(values=c("#005f73", "#bbbbbb", "#f8cd48")) +
+  scale_fill_manual(values=c("#005f73", "#bbbbbb", "#f8cd48")) +
+  coord_cartesian(xlim = c(0.5, 6), ylim = c(0, 6), expand=F) +
+  scale_y_continuous(breaks = seq(0,6, by=1)) +
+  default_plot_theme + theme(plot.margin = unit(c(0, 0.25, 0.25, 0.25), "cm"))
+
+fig5e = ggplot(subset(df5, dataset == 'VDR' & architecture == 'mlp'),  aes(x = n_start, y=enrichment_mean, color=acquisition_method, fill=acquisition_method, linetype=architecture, group=acquisition_method))+
+  geom_pointrange(aes(ymin=enrichment_mean-enrichment_se, ymax=enrichment_mean+enrichment_se), size = 0, linewidth=0.75, alpha=0.5) + 
+  geom_point(size=1) +
+  labs(y = 'Mean enrichment in\n1000 acquired molecules', x='molecules in the start set', color = 'Method', fill = 'Method')+
+  scale_color_manual(values=c("#005f73", "#bbbbbb", "#f8cd48")) +
+  scale_fill_manual(values=c("#005f73", "#bbbbbb", "#f8cd48")) +
+  coord_cartesian(xlim = c(0.5, 6), ylim = c(0, 6), expand=F) +
+  scale_y_continuous(breaks = seq(0,6, by=1)) +
+  default_plot_theme + theme(plot.margin = unit(c(-0.25, 0, 0.5, 0.25), "cm"))
+
+fig5f = ggplot(subset(df5, dataset == 'VDR' & architecture == 'gcn'),  aes(x = n_start, y=enrichment_mean, color=acquisition_method, fill=acquisition_method, linetype=architecture, group=acquisition_method))+
+  geom_pointrange(aes(ymin=enrichment_mean-enrichment_se, ymax=enrichment_mean+enrichment_se), size = 0, linewidth=0.75, alpha=0.5) + 
+  geom_point(size=1) +
+  labs(y = '', x='molecules in the start set', color = 'Method', fill = 'Method')+
+  scale_color_manual(values=c("#005f73", "#bbbbbb", "#f8cd48")) +
+  scale_fill_manual(values=c("#005f73", "#bbbbbb", "#f8cd48")) +
+  coord_cartesian(xlim = c(0.5, 6), ylim = c(0, 6), expand=F) +
+  scale_y_continuous(breaks = seq(0,6, by=1)) +
+  default_plot_theme + theme(plot.margin = unit(c(-0.25, 0.25, 0.5, 0.25), "cm"))
+
+# "#005f73" "#6f9cbc" "#6d7889" "#ee9b00" "#bbbbbb" "#f8cd48"
+
+fig5 = plot_grid(fig5a, fig5b, 
+                 fig5c, fig5d,
+                 fig5e, fig5f,
+                 labels = c('a', 'b', 'c', 'd', 'e', 'f'), 
+                 ncol=2, label_size=8)
+fig5
+
+# 180 mm/ 88 mm
+dev.print(pdf, 'al_v2_fig5_v1.pdf', width = 88/25.4, height = 123/25.4)
+
+
+
+####
+
+df6 = subset(df, train_cycle <= 15 & batch_size == 64 & bias == 'Innate')
+df6 = subset(df6, acquisition_method %in% c("Similarity", "BALD (least mutual information)"))
+
+df6 = df6[c(2, 32, 34, 35, 36, 38, 41, 151)]
+df6$id = paste(df6$architecture, df6$n_start, df6$seed, df6$dataset)
+
+df6_sim = subset(df6, acquisition_method == "Similarity")
+df6_bald = subset(df6, acquisition_method == "BALD (least mutual information)")
+
+df6_sim = df6_sim[order(df6_sim$id),]
+df6_bald = df6_bald[order(df6_bald$id),]
+
+# difference in enrichment
+df6_sim$enrichment = df6_bald$enrichment - df6_sim$enrichment 
+
+
+df6 = df6_sim %>%
+  group_by(acquisition_method, n_start, dataset, train_cycle, architecture) %>%
+  summarise(across(c("hits_discovered", 'enrichment'), 
+                   list(mean = mean, sd = sd, se = se))) %>% ungroup()
+
+col_gradient = c("#bbbbbb", "#94d2bd", "#0a9396", "#005F73", "#f8cd48", "#ee9b00")
+
+
+fig6a = ggplot(subset(df6, dataset == 'PKM2' & architecture == 'mlp'), aes(x = train_cycle, y=enrichment_mean, color=n_start, linetype=architecture, fill=n_start))+
+  geom_ribbon(aes(ymin = enrichment_mean - enrichment_se, ymax = enrichment_mean + enrichment_se), 
+              color=NA, alpha=0.1) +
+  geom_line(size=0.6) +
+  labs(y = 'Increase in enrichment\nover similarity search', x='', color = 'Start size', fill = 'Method')+
+  scale_color_manual(values=col_gradient) +
+  scale_fill_manual(values=col_gradient) +
+  coord_cartesian(xlim = c(0, 15.1), ylim = c(-2, 4), expand=F) +
+  scale_y_continuous(breaks = seq(-2, 4, by=1)) +
+  default_plot_theme + theme(plot.margin = unit(c(0.25, 0, 0, 0.25), "cm"))
+
+fig6b = ggplot(subset(df6, dataset == 'PKM2' & architecture == 'gcn'), aes(x = train_cycle, y=enrichment_mean, color=n_start, linetype=architecture, fill=n_start))+
+  geom_ribbon(aes(ymin = enrichment_mean - enrichment_se, ymax = enrichment_mean + enrichment_se), 
+              color=NA, alpha=0.1) +
+  geom_line(size=0.6) +
+  labs(y = '', x='', color = 'Start size', fill = 'Method')+
+  scale_color_manual(values=col_gradient) +
+  scale_fill_manual(values=col_gradient) +
+  coord_cartesian(xlim = c(0, 15.1), ylim = c(-2, 4), expand=F) +
+  scale_y_continuous(breaks = seq(-2, 4, by=1)) +
+  scale_linetype_manual(values=c("dashed"))+
+  default_plot_theme + theme(plot.margin = unit(c(0.25, 0.25, 0, 0.25), "cm"))
+
+fig6c = ggplot(subset(df6, dataset == 'ALDH1' & architecture == 'mlp'), aes(x = train_cycle, y=enrichment_mean, color=n_start, linetype=architecture, fill=n_start))+
+  geom_ribbon(aes(ymin = enrichment_mean - enrichment_se, ymax = enrichment_mean + enrichment_se), 
+              color=NA, alpha=0.1) +
+  geom_line(size=0.6) +
+  labs(y = 'Increase in enrichment\nover similarity search', x='', color = 'Start size', fill = 'Method')+
+  scale_color_manual(values=col_gradient) +
+  scale_fill_manual(values=col_gradient) +
+  coord_cartesian(xlim = c(0, 15.1), ylim = c(-2, 4), expand=F) +
+  scale_y_continuous(breaks = seq(-2, 4, by=1)) +
+  default_plot_theme + theme(plot.margin = unit(c(0, 0, 0.25, 0.25), "cm"))
+
+fig6d = ggplot(subset(df6, dataset == 'ALDH1' & architecture == 'gcn'), aes(x = train_cycle, y=enrichment_mean, color=n_start, linetype=architecture, fill=n_start))+
+  geom_ribbon(aes(ymin = enrichment_mean - enrichment_se, ymax = enrichment_mean + enrichment_se), 
+              color=NA, alpha=0.1) +
+  geom_line(size=0.6) +
+  labs(y = '', x='', color = 'Start size', fill = 'Method')+
+  scale_color_manual(values=col_gradient) +
+  scale_fill_manual(values=col_gradient) +
+  coord_cartesian(xlim = c(0, 15.1), ylim = c(-2, 4), expand=F) +
+  scale_y_continuous(breaks = seq(-2, 4, by=1)) +
+  scale_linetype_manual(values=c("dashed"))+
+  default_plot_theme + theme(plot.margin = unit(c(0, 0.25, 0.25, 0.25), "cm"))
+
+fig6e = ggplot(subset(df6, dataset == 'VDR' & architecture == 'mlp'), aes(x = train_cycle, y=enrichment_mean, color=n_start, linetype=architecture, fill=n_start))+
+  geom_ribbon(aes(ymin = enrichment_mean - enrichment_se, ymax = enrichment_mean + enrichment_se), 
+              color=NA, alpha=0.1) +
+  geom_line(size=0.6) +
+  labs(y = 'Increase in enrichment\nover similarity search', x='active learning cycle', color = 'Start size', fill = 'Method')+
+  scale_color_manual(values=col_gradient) +
+  scale_fill_manual(values=col_gradient) +
+  coord_cartesian(xlim = c(0, 15.1), ylim = c(-2, 4), expand=F) +
+  scale_y_continuous(breaks = seq(-2, 4, by=1)) +
+  default_plot_theme + theme(plot.margin = unit(c(-0.25, 0, 0.5, 0.25), "cm"))
+
+fig6f = ggplot(subset(df6, dataset == 'VDR' & architecture == 'gcn'), aes(x = train_cycle, y=enrichment_mean, color=n_start, linetype=architecture, fill=n_start))+
+  geom_ribbon(aes(ymin = enrichment_mean - enrichment_se, ymax = enrichment_mean + enrichment_se), 
+              color=NA, alpha=0.1) +
+  geom_line(size=0.6) +
+  labs(y = '', x='active learning cycle', color = 'Start size', fill = 'Method')+
+  scale_color_manual(values=col_gradient) +
+  scale_fill_manual(values=col_gradient) +
+  coord_cartesian(xlim = c(0, 15.1), ylim = c(-2, 4), expand=F) +
+  scale_y_continuous(breaks = seq(-2, 4, by=1)) +
+  scale_linetype_manual(values=c("dashed"))+
+  default_plot_theme + theme(plot.margin = unit(c(-0.25, 0.25, 0.5, 0.25), "cm"))
+
+fig6 = plot_grid(fig6a, fig6b, 
+                 fig6c, fig6d,
+                 fig6e, fig6f,
+                 labels = c('a', 'b', 'c', 'd', 'e', 'f'), 
+                 ncol=2, label_size=8)
+fig6
+
+dev.print(pdf, 'al_v2_fig6_v2.pdf', width = 88/25.4, height = 123/25.4)
+
+
+### Supp. Fig. 1: UMAP ####
+
+df_UMAP_PKM2 <- read_csv("UMAP_PKM2.csv")
+df_UMAP_PKM2 = df_UMAP_PKM2[order(df_UMAP_PKM2$y, decreasing=F),]
+df_UMAP_PKM2$y = factor(df_UMAP_PKM2$y)
+df_UMAP_PKM2$y_alpha = as.numeric(df_UMAP_PKM2$y )
+df_UMAP_PKM2$y_size = df_UMAP_PKM2$y_alpha
+df_UMAP_PKM2$y_size[df_UMAP_PKM2$y_size == 2] = 0.25
+df_UMAP_ALDH1$y_alpha[df_UMAP_PKM2$y_alpha == 1] = 0.05
+
+sfig1a = ggplot(data=df_UMAP_PKM2, aes(x=UMAP1, y=UMAP2, color=y))+
+  geom_point(size=df_UMAP_PKM2$y_size, shape=16, alpha=df_UMAP_PKM2$y_alpha) +
+  labs(title='PKM2')+
+  scale_color_manual(values=c("#c3d6d9", "#005F73")) +
+  default_plot_theme
+
+df_UMAP_ALDH1 <- read_csv("UMAP_ALDH1.csv")
+df_UMAP_ALDH1 = df_UMAP_ALDH1[order(df_UMAP_ALDH1$y, decreasing=F),]
+df_UMAP_ALDH1$y = factor(df_UMAP_ALDH1$y)
+df_UMAP_ALDH1$y_alpha = as.numeric(df_UMAP_ALDH1$y )
+df_UMAP_ALDH1$y_size = df_UMAP_ALDH1$y_alpha
+df_UMAP_ALDH1$y_size[df_UMAP_ALDH1$y_size == 2] = 0.25
+df_UMAP_ALDH1$y_alpha[df_UMAP_ALDH1$y_alpha == 1] = 0.05
+
+sfig1b = ggplot(data=df_UMAP_ALDH1, aes(x=UMAP1, y=UMAP2, color=y))+
+  geom_point(size=df_UMAP_ALDH1$y_size, shape=16, alpha=df_UMAP_ALDH1$y_alpha) +
+  labs(title='ALDH1')+
+  scale_color_manual(values=c("#c3d6d9", "#005F73")) +
+  default_plot_theme
+
+df_UMAP_VDR <- read_csv("UMAP_VDR.csv")
+df_UMAP_VDR = df_UMAP_VDR[order(df_UMAP_VDR$y, decreasing=F),]
+df_UMAP_VDR$y = factor(df_UMAP_VDR$y)
+df_UMAP_VDR$y_alpha = as.numeric(df_UMAP_VDR$y )
+df_UMAP_VDR$y_size = df_UMAP_VDR$y_alpha
+df_UMAP_VDR$y_size[df_UMAP_VDR$y_size == 2] = 0.25
+df_UMAP_VDR$y_alpha[df_UMAP_VDR$y_alpha == 1] = 0.05
+
+sfig1c = ggplot(data=df_UMAP_VDR, aes(x=UMAP1, y=UMAP2, color=y))+
+  geom_point(size=df_UMAP_VDR$y_size, shape=16, alpha=df_UMAP_VDR$y_alpha) +
+  labs(title='VDR')+
+  scale_color_manual(values=c("#c3d6d9", "#005F73")) +
+  default_plot_theme
+
+plot_grid(sfig1a, sfig1b, sfig1c, 
+          labels = c('a', 'b', 'c'), 
+          ncol=3, label_size=8)
+
+dev.print(pdf, 'al_sfig1_umap.pdf', width = 180/25.4, height = 60/25.4)
+
+
+#### PCA ###
+
+df_pca <- read_csv("pca.csv")
+
+df_pca = df_pca[order(df_pca$exploitation_static, decreasing=F),]
+df_pca$exploitation_static = factor(df_pca$exploitation_static)
+df_pca$exploitation_static_alpha = as.numeric(df_pca$exploitation_static )
+df_pca$exploitation_static_alpha[df_pca$exploitation_static_alpha == 1] = 0.05
+p1 = ggplot(data=df_pca, aes(x=UMAP1, y=UMAP2, color=exploitation_static))+
+  geom_point(size=0.75, shape=16, alpha=df_pca$exploitation_static_alpha) +
+  labs(title='exploitation_static')+
+  scale_color_manual(values=c("#c3d6d9", "#005F73", "#ee9b00")) +
+  default_plot_theme
+
+df_pca = df_pca[order(df_pca$similarity, decreasing=F),]
+df_pca$similarity = factor(df_pca$similarity)
+df_pca$similarity_alpha = as.numeric(df_pca$similarity )
+df_pca$similarity_alpha[df_pca$similarity_alpha == 1] = 0.05
+p2 = ggplot(data=df_pca, aes(x=UMAP1, y=UMAP2, color=similarity))+
+  geom_point(size=0.75, shape=16, alpha=df_pca$similarity_alpha) +
+  labs(title='similarity')+
+  scale_color_manual(values=c("#c3d6d9", "#005F73", "#ee9b00")) +
+  default_plot_theme
+
+df_pca = df_pca[order(df_pca$exploitation, decreasing=F),]
+df_pca$exploitation = factor(df_pca$exploitation)
+df_pca$exploitation_alpha = as.numeric(df_pca$exploitation )
+df_pca$exploitation_alpha[df_pca$exploitation_alpha == 1] = 0.05
+p3 = ggplot(data=df_pca, aes(x=UMAP1, y=UMAP2, color=exploitation))+
+  geom_point(size=0.75, shape=16, alpha=df_pca$exploitation_alpha) +
+  labs(title='exploitation')+
+  scale_color_manual(values=c("#c3d6d9", "#005F73", "#ee9b00")) +
+  default_plot_theme
+
+plot_grid(p2, p1, p3, 
+          labels = c('a', 'b', 'c'), 
+          ncol=3, label_size=8)
+
+dev.print(pdf, 'al_v2_fig4_umap_.pdf', width = 180/25.4, height = 60/25.4)
+
+
 #### Supplementary ####
 ##### S1. UMAP ######
 
@@ -504,7 +801,6 @@ p_umap_aldh1 = ggplot(umap_aldh1, aes(x=umap_x, y=umap_y, color = as.character(y
     panel.grid.major = element_blank(),
     panel.grid.minor = element_blank())
 
-
 umap_pkm2 <- read_csv("Dropbox/PycharmProjects/Active_Learning_Simulation/data/PKM2/screen/umap.csv")
 umap_pkm2 = subset(umap_pkm2, split == 's')
 umap_pkm2 = umap_pkm2[order(umap_pkm2$y),]
@@ -523,7 +819,6 @@ p_umap_pkm2 = ggplot(umap_pkm2, aes(x=umap_x, y=umap_y, color = as.character(y))
     legend.position = 'None',
     panel.grid.major = element_blank(),
     panel.grid.minor = element_blank())
-
 
 umap_vdr <- read_csv("Dropbox/PycharmProjects/Active_Learning_Simulation/data/VDR/screen/umap.csv")
 umap_vdr = subset(umap_vdr, split == 's')
@@ -557,7 +852,7 @@ dev.print(pdf, 'al_Sup_fig1.pdf', width = 180/25.4, height = 60/25.4)
 
 ##### S2. ROC AUC #####
 
-dfs2 = subset(df, train_cycle >= 0 & batch_size == 64 & bias == 'Innate') %>%
+dfs2 = subset(df, train_cycle >= 0 & batch_size == 64 & bias == 'Innate' & n_start == 64) %>%
   group_by(acquisition_method, bias, dataset, total_mols_screened, train_cycle, architecture) %>%
   summarise(across(c("hits_discovered", "test_tpr", 'test_roc_auc', 
                      'test_balanced_accuracy', 'enrichment'), 
@@ -651,7 +946,7 @@ dev.print(pdf, 'al_Sup_fig2.pdf', width = 88/25.4, height = 110/25.4)
 
 ##### S3. Batch size #####
 
-dfs3a = subset(df, train_cycle == 15 & architecture == 'mlp' & dataset == 'ALDH1' & bias == 'Innate')
+dfs3a = subset(df, train_cycle == 15 & architecture == 'mlp' & dataset == 'ALDH1' & bias == 'Innate' & n_start == 64)
 dfs3a$batch_size = as.numeric(as.character(dfs3a$batch_size))
 
 figs3a = ggplot(dfs3a, aes(x = batch_size, y = enrichment, color = acquisition_method, fill = acquisition_method))+
@@ -665,7 +960,7 @@ figs3a = ggplot(dfs3a, aes(x = batch_size, y = enrichment, color = acquisition_m
   default_plot_theme + theme(plot.margin = unit(c(0.25, 0, 0.25, 0.5), "cm"))
 
 
-dfs3b = subset(df, train_cycle == 15 & architecture == 'gcn' & dataset == 'ALDH1' & bias == 'Innate')
+dfs3b = subset(df, train_cycle == 15 & architecture == 'gcn' & dataset == 'ALDH1' & bias == 'Innate' & n_start == 64)
 dfs3b$batch_size = as.numeric(as.character(dfs3b$batch_size))
 
 figs3b = ggplot(dfs3b, aes(x = batch_size, y = enrichment, color = acquisition_method, fill = acquisition_method))+
@@ -679,7 +974,7 @@ figs3b = ggplot(dfs3b, aes(x = batch_size, y = enrichment, color = acquisition_m
   default_plot_theme + theme(plot.margin = unit(c(0.25, 0.25, 0.25, 0.5), "cm"))
 
 
-dfs3c = subset(df, train_cycle == 15 & architecture == 'mlp' & dataset == 'ALDH1' & bias == 'Innate')
+dfs3c = subset(df, train_cycle == 15 & architecture == 'mlp' & dataset == 'ALDH1' & bias == 'Innate' & n_start == 64)
 dfs3c$batch_size = as.numeric(as.character(dfs3c$batch_size))
 
 figs3c = ggplot(dfs3c, aes(x = batch_size, y = test_roc_auc, color = acquisition_method, fill = acquisition_method))+
@@ -693,7 +988,7 @@ figs3c = ggplot(dfs3c, aes(x = batch_size, y = test_roc_auc, color = acquisition
   default_plot_theme + theme(plot.margin = unit(c(0.25, 0, 0.25, 0.25), "cm"))
 
 
-dfs3d = subset(df, train_cycle == 15 & architecture == 'gcn' & dataset == 'ALDH1' & bias == 'Innate')
+dfs3d = subset(df, train_cycle == 15 & architecture == 'gcn' & dataset == 'ALDH1' & bias == 'Innate' & n_start == 64)
 dfs3d$batch_size = as.numeric(as.character(dfs3d$batch_size))
 
 figs3d = ggplot(dfs3d, aes(x = batch_size, y = test_roc_auc, color = acquisition_method, fill = acquisition_method))+
@@ -717,8 +1012,8 @@ dev.print(pdf, 'al_Sup_fig3.pdf', width = 88/25.4, height = 80/25.4)
 ##### S4. Bias ######
 ###### first row ######
 
-dfs4ac = subset(df, train_cycle == 15 & batch_size == 64 & architecture == 'mlp' & dataset == 'PKM2')
-mean_sim_per_method = subset(df, train_cycle == 0 & batch_size == 64 & architecture == 'mlp' & dataset == 'PKM2')  # $mean_total_sims
+dfs4ac = subset(df, train_cycle == 15 & batch_size == 64 & architecture == 'mlp' & dataset == 'PKM2' & n_start == 64)
+mean_sim_per_method = subset(df, train_cycle == 0 & batch_size == 64 & architecture == 'mlp' & dataset == 'PKM2' & n_start == 64)  # $mean_total_sims
 
 starting_bias = c()
 for (i_row in 1:nrow(dfs4ac)){
@@ -747,8 +1042,8 @@ figs4c = ggplot(dfs4ac, aes(x = starting_bias, y = test_roc_auc, color = acquisi
   default_plot_theme + theme(plot.margin = unit(c(0.25, 0, 0.25, 0.25), "cm"))
 
 
-dfs4bd = subset(df, train_cycle == 15 & batch_size == 64 & architecture == 'gcn' & dataset == 'PKM2')
-mean_sim_per_method = subset(df, train_cycle == 0 & batch_size == 64 & architecture == 'gcn' & dataset == 'PKM2')  # $mean_total_sims
+dfs4bd = subset(df, train_cycle == 15 & batch_size == 64 & architecture == 'gcn' & dataset == 'PKM2' & n_start == 64)
+mean_sim_per_method = subset(df, train_cycle == 0 & batch_size == 64 & architecture == 'gcn' & dataset == 'PKM2' & n_start == 64)  # $mean_total_sims
 
 starting_bias = c()
 for (i_row in 1:nrow(dfs4bd)){
@@ -779,8 +1074,8 @@ figs4d = ggplot(dfs4bd, aes(x = starting_bias, y = test_roc_auc, color = acquisi
 
 ###### second row ######
 
-dfs4eg = subset(df, train_cycle == 15 & batch_size == 64 & architecture == 'mlp' & dataset == 'ALDH1')
-mean_sim_per_method = subset(df, train_cycle == 0 & batch_size == 64 & architecture == 'mlp' & dataset == 'ALDH1')  # $mean_total_sims
+dfs4eg = subset(df, train_cycle == 15 & batch_size == 64 & architecture == 'mlp' & dataset == 'ALDH1' & n_start == 64)
+mean_sim_per_method = subset(df, train_cycle == 0 & batch_size == 64 & architecture == 'mlp' & dataset == 'ALDH1' & n_start == 64)  # $mean_total_sims
 
 starting_bias = c()
 for (i_row in 1:nrow(dfs4eg)){
@@ -810,8 +1105,8 @@ figs4g = ggplot(dfs4eg, aes(x = starting_bias, y = test_roc_auc, color = acquisi
   default_plot_theme + theme(plot.margin = unit(c(0.25, 0, 0.25, 0.25), "cm"))
 
 
-dfs4fh = subset(df, train_cycle == 15 & batch_size == 64 & architecture == 'gcn' & dataset == 'ALDH1')
-mean_sim_per_method = subset(df, train_cycle == 0 & batch_size == 64 & architecture == 'gcn' & dataset == 'ALDH1')  # $mean_total_sims
+dfs4fh = subset(df, train_cycle == 15 & batch_size == 64 & architecture == 'gcn' & dataset == 'ALDH1' & n_start == 64)
+mean_sim_per_method = subset(df, train_cycle == 0 & batch_size == 64 & architecture == 'gcn' & dataset == 'ALDH1' & n_start == 64)  # $mean_total_sims
 
 starting_bias = c()
 for (i_row in 1:nrow(dfs4fh)){
@@ -842,8 +1137,8 @@ figs4h = ggplot(dfs4fh, aes(x = starting_bias, y = test_roc_auc, color = acquisi
 
 ###### third row ######
 
-dfs4ik= subset(df, train_cycle == 15 & batch_size == 64 & architecture == 'mlp' & dataset == 'VDR')
-mean_sim_per_method = subset(df, train_cycle == 0 & batch_size == 64 & architecture == 'mlp' & dataset == 'VDR')  # $mean_total_sims
+dfs4ik= subset(df, train_cycle == 15 & batch_size == 64 & architecture == 'mlp' & dataset == 'VDR' & n_start == 64)
+mean_sim_per_method = subset(df, train_cycle == 0 & batch_size == 64 & architecture == 'mlp' & dataset == 'VDR' & n_start == 64)  # $mean_total_sims
 
 starting_bias = c()
 for (i_row in 1:nrow(dfs4ik)){
@@ -871,8 +1166,8 @@ figs4k = ggplot(dfs4ik, aes(x = starting_bias, y = test_roc_auc, color = acquisi
   scale_fill_manual(values=custom_colours) +
   default_plot_theme + theme(plot.margin = unit(c(0.25, 0, 0.25, 0.25), "cm"))
 
-dfs4jl = subset(df, train_cycle == 15 & batch_size == 64 & architecture == 'gcn' & dataset == 'VDR')
-mean_sim_per_method = subset(df, train_cycle == 0 & batch_size == 64 & architecture == 'gcn' & dataset == 'VDR')  # $mean_total_sims
+dfs4jl = subset(df, train_cycle == 15 & batch_size == 64 & architecture == 'gcn' & dataset == 'VDR' & n_start == 64)
+mean_sim_per_method = subset(df, train_cycle == 0 & batch_size == 64 & architecture == 'gcn' & dataset == 'VDR' & n_start == 64)  # $mean_total_sims
 
 starting_bias = c()
 for (i_row in 1:nrow(dfs4jl)){
@@ -915,7 +1210,7 @@ dev.print(pdf, 'al_Sup_fig4.pdf', width = 180/25.4, height = 130/25.4)
 
 ##### S5. ####
 
-dfx = subset(df, train_cycle >= 0 & batch_size == 64 & bias == 'Innate' & architecture == 'mlp' & dataset == 'ALDH1')
+dfx = subset(df, train_cycle >= 0 & batch_size == 64 & bias == 'Innate' & architecture == 'mlp' & dataset == 'ALDH1' & n_start == 64)
 
 dfxx = dfx %>%
   group_by(acquisition_method, total_mols_screened) %>%
@@ -936,3 +1231,87 @@ figsx = ggplot(dfxx, aes(x = total_mols_screened, y=hit_unique_patterns_mean, co
 dev.print(pdf, 'al_Sup_fig5.pdf', width = 44/25.4, height = 44/25.4)
 
 #### End ####
+
+
+## Video plot
+
+# # # df$train_cycle
+# cycle = 15
+# df5 = subset(df, train_cycle == cycle & batch_size == 64 & bias == 'Innate')
+# df5 = subset(df5, acquisition_method %in% c("Random", "Similarity", "BALD (least mutual information)"))
+# 
+# df5 = df5 %>%
+#   group_by(acquisition_method, n_start, dataset, total_mols_screened, train_cycle, architecture) %>%
+#   summarise(across(c("hits_discovered", "test_tpr", 'test_roc_auc', 
+#                      'test_balanced_accuracy', 'enrichment'), 
+#                    list(mean = mean, sd = sd, se = se))) %>% ungroup()
+# 
+# 
+# fig5a = ggplot(subset(df5, dataset == 'PKM2' & architecture == 'mlp'), aes(x = n_start, y=enrichment_mean, color=acquisition_method, fill=acquisition_method, linetype=architecture, group=acquisition_method))+
+#   geom_pointrange(aes(ymin=enrichment_mean-enrichment_se, ymax=enrichment_mean+enrichment_se), size = 0, linewidth=0.75, alpha=0.5) + 
+#   geom_point(size=1) +
+#   labs(y = paste('Mean enrichment after', cycle, 'cycles'), x='', color = 'Method', fill = 'Method')+
+#   scale_color_manual(values=c("#005f73", "#bbbbbb", "#f8cd48")) +
+#   scale_fill_manual(values=c("#005f73", "#bbbbbb", "#f8cd48")) +
+#   coord_cartesian(xlim = c(0.5, 6.5), ylim = c(0, 6), expand=F) +
+#   scale_y_continuous(breaks = seq(0,6, by=1)) +
+#   default_plot_theme + theme(plot.margin = unit(c(0.25, 0, 0, 0.25), "cm"))
+# # u r b l
+# fig5b = ggplot(subset(df5, dataset == 'PKM2' & architecture == 'gcn'), aes(x = n_start, y=enrichment_mean, color=acquisition_method, fill=acquisition_method, linetype=architecture, group=acquisition_method))+
+#   geom_pointrange(aes(ymin=enrichment_mean-enrichment_se, ymax=enrichment_mean+enrichment_se), size = 0, linewidth=0.75, alpha=0.5) + 
+#   geom_point(size=1) +
+#   labs(y = '', x='', color = 'Method', fill = 'Method')+
+#   scale_color_manual(values=c("#005f73", "#bbbbbb", "#f8cd48")) +
+#   scale_fill_manual(values=c("#005f73", "#bbbbbb", "#f8cd48")) +
+#   coord_cartesian(xlim = c(0.5, 6.5), ylim = c(0, 6), expand=F) +
+#   scale_y_continuous(breaks = seq(0,6, by=1)) +
+#   default_plot_theme + theme(plot.margin = unit(c(0.25, 0.25, 0, 0.25), "cm"))
+# 
+# fig5c = ggplot(subset(df5, dataset == 'ALDH1' & architecture == 'mlp'), aes(x = n_start, y=enrichment_mean, color=acquisition_method, fill=acquisition_method, linetype=architecture, group=acquisition_method))+
+#   geom_pointrange(aes(ymin=enrichment_mean-enrichment_se, ymax=enrichment_mean+enrichment_se), size = 0, linewidth=0.75, alpha=0.5) + 
+#   geom_point(size=1) +
+#   labs(y = paste('Mean enrichment after', cycle, 'cycles'), x='', color = 'Method', fill = 'Method')+
+#   scale_color_manual(values=c("#005f73", "#bbbbbb", "#f8cd48")) +
+#   scale_fill_manual(values=c("#005f73", "#bbbbbb", "#f8cd48")) +
+#   coord_cartesian(xlim = c(0.5, 6.5), ylim = c(0, 6), expand=F) +
+#   scale_y_continuous(breaks = seq(0,6, by=1)) +
+#   default_plot_theme + theme(plot.margin = unit(c(0, 0, 0.25, 0.25), "cm"))
+# 
+# fig5d = ggplot(subset(df5, dataset == 'ALDH1' & architecture == 'gcn'), aes(x = n_start, y=enrichment_mean, color=acquisition_method, fill=acquisition_method, linetype=architecture, group=acquisition_method))+
+#   geom_pointrange(aes(ymin=enrichment_mean-enrichment_se, ymax=enrichment_mean+enrichment_se), size = 0, linewidth=0.75, alpha=0.5) + 
+#   geom_point(size=1) +
+#   labs(y = '', x='', color = 'Method', fill = 'Method')+
+#   scale_color_manual(values=c("#005f73", "#bbbbbb", "#f8cd48")) +
+#   scale_fill_manual(values=c("#005f73", "#bbbbbb", "#f8cd48")) +
+#   coord_cartesian(xlim = c(0.5, 6.5), ylim = c(0, 6), expand=F) +
+#   scale_y_continuous(breaks = seq(0,6, by=1)) +
+#   default_plot_theme + theme(plot.margin = unit(c(0, 0.25, 0.25, 0.25), "cm"))
+# 
+# fig5e = ggplot(subset(df5, dataset == 'VDR' & architecture == 'mlp'),  aes(x = n_start, y=enrichment_mean, color=acquisition_method, fill=acquisition_method, linetype=architecture, group=acquisition_method))+
+#   geom_pointrange(aes(ymin=enrichment_mean-enrichment_se, ymax=enrichment_mean+enrichment_se), size = 0, linewidth=0.75, alpha=0.5) + 
+#   geom_point(size=1) +
+#   labs(y = paste('Mean enrichment after', cycle, 'cycles'), x='molecules in the start set', color = 'Method', fill = 'Method')+
+#   scale_color_manual(values=c("#005f73", "#bbbbbb", "#f8cd48")) +
+#   scale_fill_manual(values=c("#005f73", "#bbbbbb", "#f8cd48")) +
+#   coord_cartesian(xlim = c(0.5, 6.5), ylim = c(0, 6), expand=F) +
+#   scale_y_continuous(breaks = seq(0,6, by=1)) +
+#   default_plot_theme + theme(plot.margin = unit(c(-0.25, 0, 0.5, 0.25), "cm"))
+# 
+# fig5f = ggplot(subset(df5, dataset == 'VDR' & architecture == 'gcn'),  aes(x = n_start, y=enrichment_mean, color=acquisition_method, fill=acquisition_method, linetype=architecture, group=acquisition_method))+
+#   geom_pointrange(aes(ymin=enrichment_mean-enrichment_se, ymax=enrichment_mean+enrichment_se), size = 0, linewidth=0.75, alpha=0.5) + 
+#   geom_point(size=1) +
+#   labs(y = '', x='molecules in the start set', color = 'Method', fill = 'Method')+
+#   scale_color_manual(values=c("#005f73", "#bbbbbb", "#f8cd48")) +
+#   scale_fill_manual(values=c("#005f73", "#bbbbbb", "#f8cd48")) +
+#   coord_cartesian(xlim = c(0.5, 6.5), ylim = c(0, 6), expand=F) +
+#   scale_y_continuous(breaks = seq(0,6, by=1)) +
+#   default_plot_theme + theme(plot.margin = unit(c(-0.25, 0.25, 0.5, 0.25), "cm"))
+# 
+# # "#005f73" "#6f9cbc" "#6d7889" "#ee9b00" "#bbbbbb" "#f8cd48"
+# 
+# fig5 = plot_grid(fig5a, fig5b, 
+#                  fig5c, fig5d,
+#                  fig5e, fig5f,
+#                  labels = c('a', 'b', 'c', 'd', 'e', 'f'), 
+#                  ncol=2, label_size=8)
+# fig5
