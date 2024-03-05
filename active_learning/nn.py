@@ -285,7 +285,7 @@ class Model(torch.nn.Module):
 
                 self.optimizer.zero_grad()
 
-                with torch.autocast(device_type=self.device_type, dtype=torch.float16):
+                with torch.autocast(device_type=self.device_type, dtype=torch.bfloat16):
 
                     if self.architecture in ['gcn', 'gat', 'gin']:
                         batch.to(self.device)
@@ -333,7 +333,7 @@ class Model(torch.nn.Module):
         """
         y_hats = torch.tensor([]).to(self.device)
         with torch.no_grad():
-            with torch.autocast(device_type=self.device_type, dtype=torch.float16):
+            with torch.autocast(device_type=self.device_type, dtype=torch.bfloat16):
                 for batch in dataloader:
                     if self.architecture in ['gcn', 'gat', 'gin']:
                         batch.to(self.device)
