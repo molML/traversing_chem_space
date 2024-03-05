@@ -33,9 +33,6 @@ class Handler:
     def get_start_data(self, n_start: int = 64, bias: str = 'random', seed: int = 0) -> (np.ndarray, np.ndarray):
 
         rng = np.random.default_rng(seed=seed)
-        starting_clusters = torch.load(os.path.join(ROOT_DIR, f'data/{self.dataset}/screen/starting_clusters'))
-        n_clusters = len(starting_clusters)
-        self.selected_start_cluster = seed if seed <= n_clusters else rng.integers(0, n_clusters)
 
         if bias == 'random':
             # get a random hit to start out with
@@ -46,6 +43,10 @@ class Handler:
             remaining_idxs = np.array([i for i in range(len(self.all_y)) if i not in selected_hit_idx])
             selected_others_idx = rng.integers(0, len(remaining_idxs), n_start - 1)
         else:
+            starting_clusters = torch.load(os.path.join(ROOT_DIR, f'data/{self.dataset}/screen/starting_clusters'))
+            n_clusters = len(starting_clusters)
+            self.selected_start_cluster = seed if seed <= n_clusters else rng.integers(0, n_clusters)
+
             # select a random cluster
             cluster_smiles = starting_clusters[self.selected_start_cluster][0 if bias == 'large' else 1]
 
