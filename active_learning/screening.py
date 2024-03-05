@@ -21,7 +21,6 @@ from math import ceil
 
 INFERENCE_BATCH_SIZE = 512
 TRAINING_BATCH_SIZE = 64
-NUM_WORKERS = 4
 
 
 def active_learning(n_start: int = 64, acquisition_method: str = 'exploration', max_screen_size: int = None,
@@ -58,7 +57,6 @@ def active_learning(n_start: int = 64, acquisition_method: str = 'exploration', 
     x_test, y_test, smiles_test = ds_test.all()
     test_loader = to_torch_dataloader(x_test, y_test,
                                       batch_size=INFERENCE_BATCH_SIZE,
-                                      num_workers=NUM_WORKERS,
                                       shuffle=False, pin_memory=True)
 
     n_cycles = ceil((max_screen_size - n_start) / batch_size)
@@ -77,7 +75,7 @@ def active_learning(n_start: int = 64, acquisition_method: str = 'exploration', 
 
         # Update some tracking variables
         all_train_smiles.append(';'.join(smiles_train.tolist()))
-        hits_discovered.append(sum(y_train))
+        hits_discovered.append(sum(y_train).item())
         hits = smiles_train[np.where(y_train == 1)]
         total_mols_screened.append(len(y_train))
 
@@ -92,18 +90,15 @@ def active_learning(n_start: int = 64, acquisition_method: str = 'exploration', 
         # Get the screen and train + balanced train loaders
         train_loader = to_torch_dataloader(x_train, y_train,
                                            batch_size=INFERENCE_BATCH_SIZE,
-                                           num_workers=NUM_WORKERS,
                                            shuffle=False, pin_memory=True)
 
         train_loader_balanced = to_torch_dataloader(x_train, y_train,
                                                     batch_size=TRAINING_BATCH_SIZE,
                                                     sampler=sampler,
-                                                    num_workers=NUM_WORKERS,
                                                     shuffle=False, pin_memory=True)
 
         screen_loader = to_torch_dataloader(x_screen, y_screen,
                                             batch_size=INFERENCE_BATCH_SIZE,
-                                            num_workers=NUM_WORKERS,
                                             shuffle=False, pin_memory=True)
 
         # Initiate and train the model (optimize if specified)
