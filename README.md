@@ -30,11 +30,11 @@ an untapped potential for low-data drug discovery, as it allows to improve a mod
 ![Figure 1](figures/fig1.png)
 
 <h2 id="modules">Modules</h2>
-- `data_prep.py`: Processes data and clusters compounds for sampling diversity.
-- `nn.py`: Contains neural network models (MLP, GCN, etc.).
-- `screening.py`: Core script for active learning cycles.
-- `utils.py`: Utility functions for data handling and evaluation.
-- `main.py`: Entry point for running experiments with customizable parameters.
+- **data_prep.py**: Processes data and clusters compounds for sampling diversity.
+- **nn.py**: Contains neural network models (MLP, GCN, etc.).
+- **screening.py**: Core script for active learning cycles.
+- **utils.py**: Utility functions for data handling and evaluation.
+- **main.py**: Entry point for running experiments with customizable parameters.
 
 <h2 id="requirements">Requirements</h2>
 
