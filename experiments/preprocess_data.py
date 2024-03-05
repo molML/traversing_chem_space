@@ -1,14 +1,33 @@
 
-import torch
-from active_learning.data_prep import MasterDataset, load_hdf5
-import numpy as np
-from scipy.cluster import hierarchy
-from collections import Counter
+import os
 import warnings
+from collections import Counter
+import torch
+import numpy as np
+import pandas as pd
+from scipy.cluster import hierarchy
+from active_learning.data_prep import MasterDataset, load_hdf5, get_data, split_data, similarity_vectors
+from config import ROOT_DIR
 warnings.simplefilter(action='ignore', category=FutureWarning)
+
 
 if __name__ == '__main__':
 
+    # Process the data
+    for dataset in ['ALDH1', 'PKM2', 'VDR']:
+
+        df = get_data(dataset=dataset)
+        df_screen, df_test = split_data(df, screen_size=1000, test_size=200, dataset=dataset)
+
+        MasterDataset(name='screen', df=df_screen, overwrite=True, dataset=dataset)
+        MasterDataset(name='test', df=df_test, overwrite=True, dataset=dataset)
+
+        df_screen = pd.read_csv(os.path.join(ROOT_DIR, f'data/{dataset}/original/screen.csv'))
+        df_test = pd.read_csv(os.path.join(ROOT_DIR, f'data/{dataset}/original/test.csv'))
+
+        similarity_vectors(df_screen, df_test, dataset=dataset)
+
+    # Perform clustering for each dataset
     for dataset, tani_cutoffs in zip(['PKM2', 'VDR', 'ALDH1'], [[0.80, 0.61], [0.80, 0.70], [0.80, 0.60]]):
         ds_screen = MasterDataset('screen', representation='ecfp', dataset=dataset)
         x_screen, y_screen, smiles_screen = ds_screen.all()

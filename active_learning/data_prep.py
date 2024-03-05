@@ -1,19 +1,18 @@
 
-
-from active_learning.utils import molecular_graph_featurizer as smiles_to_graph
-from active_learning.utils import smiles_to_ecfp, get_tanimoto_matrix, check_featurizability
+from typing import Any
+import sys
+import os
+from collections import OrderedDict
 import pandas as pd
 import numpy as np
-import torch
-import os
-import sys
-from collections import OrderedDict
-from rdkit.Chem.Scaffolds import MurckoScaffold
 from rdkit import Chem
+from rdkit.Chem.Scaffolds import MurckoScaffold
 from tqdm import tqdm
-from typing import Any
+import torch
 import h5py
 from config import ROOT_DIR
+from active_learning.utils import molecular_graph_featurizer as smiles_to_graph
+from active_learning.utils import smiles_to_ecfp, get_tanimoto_matrix, check_featurizability
 
 
 def canonicalize(smiles: str, sanitize: bool = True):
@@ -160,33 +159,14 @@ def similarity_vectors(df_screen, df_test, root: str = 'data', dataset: str = 'A
 
 
 def save_hdf5(obj: Any, filename: str):
-    import h5py
     hf = h5py.File(filename, 'w')
     hf.create_dataset('obj', data=obj)
     hf.close()
 
 
 def load_hdf5(filename: str) -> Any:
-    import h5py
     hf = h5py.File(filename, 'r')
     obj = np.array(hf.get('obj'))
     hf.close()
 
     return obj
-
-
-if __name__ == '__main__':
-
-    for dataset in ['ALDH1', 'PKM2', 'VDR']:
-
-        df = get_data(dataset=dataset)
-        df_screen, df_test = split_data(df, screen_size=100000, test_size=20000, dataset=dataset)
-
-        MasterDataset(name='screen', df=df_screen, overwrite=True, dataset=dataset)
-        MasterDataset(name='test', df=df_test, overwrite=True, dataset=dataset)
-
-        df_screen = pd.read_csv(os.path.join(ROOT_DIR, f'data/{dataset}/original/screen.csv'))
-        df_test = pd.read_csv(os.path.join(ROOT_DIR, f'data/{dataset}/original/test.csv'))
-
-        similarity_vectors(df_screen, df_test, dataset=dataset)
-
