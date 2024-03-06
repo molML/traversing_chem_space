@@ -68,7 +68,7 @@ pip3 install scikit-learn==1.3.0 rdkit==2023.3.2 pandas tqdm argparse h5py
 
 ### Data 
 
-Before running the active learning pipeline on the same data used in the paper, the original data from LITPCBA (https://drugdesign.unistra.fr/LIT-PCBA/) needs to be processed.
+Before running the active learning pipeline on the same data used in the paper, the original data from [LITPCBA](https://drugdesign.unistra.fr/LIT-PCBA/) needs to be processed.
 
 1. run `python active_learning/preprocess_data.py` to process and cluster all data. This takes around an hour on a regular computer. Clustering requires >128GB of RAM.
 
