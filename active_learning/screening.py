@@ -8,7 +8,7 @@ This script contains the main active learning loop that runs all experiments.
 
 import pandas as pd
 import numpy as np
-from active_learning.nn import Ensemble
+from active_learning.nn import Ensemble, RfEnsemble
 from active_learning.data_prep import MasterDataset
 from active_learning.data_handler import Handler
 from active_learning.utils import Evaluate, to_torch_dataloader
@@ -32,7 +32,7 @@ def active_learning(n_start: int = 64, acquisition_method: str = 'exploration', 
     :param acquisition_method: acquisition method, as defined in active_learning.acquisition
     :param max_screen_size: we stop when this number of molecules has been screened
     :param batch_size: number of molecules to add every cycle
-    :param architecture: 'gcn' or 'mlp'
+    :param architecture: 'gcn', 'mlp', or 'rf'
     :param seed: int 1-20
     :param bias: 'random', 'small', 'large'
     :param optimize_hyperparameters: Bool
@@ -41,7 +41,7 @@ def active_learning(n_start: int = 64, acquisition_method: str = 'exploration', 
     """
 
     # Load the datasets
-    representation = 'ecfp' if architecture == 'mlp' else 'graph'
+    representation = 'ecfp' if architecture in ['mlp', 'rf'] else 'graph'
     ds_screen = MasterDataset('screen', representation=representation, dataset=dataset)
     ds_test = MasterDataset('test', representation=representation, dataset=dataset)
 
@@ -82,43 +82,62 @@ def active_learning(n_start: int = 64, acquisition_method: str = 'exploration', 
         if len(train_idx) >= max_screen_size:
             break
 
-        # Get class weight to build a weighted random sampler to balance out this data
-        class_weights = [1 - sum((y_train == 0) * 1) / len(y_train), 1 - sum((y_train == 1) * 1) / len(y_train)]
-        weights = [class_weights[i] for i in y_train]
-        sampler = WeightedRandomSampler(weights, num_samples=len(y_train), replacement=True)
+        if architecture != 'rf':
+            # Get class weight to build a weighted random sampler to balance out this data
+            class_weights = [1 - sum((y_train == 0) * 1) / len(y_train), 1 - sum((y_train == 1) * 1) / len(y_train)]
+            weights = [class_weights[i] for i in y_train]
+            sampler = WeightedRandomSampler(weights, num_samples=len(y_train), replacement=True)
 
-        # Get the screen and train + balanced train loaders
-        train_loader = to_torch_dataloader(x_train, y_train,
-                                           batch_size=INFERENCE_BATCH_SIZE,
-                                           shuffle=False, pin_memory=True)
+            # Get the screen and train + balanced train loaders
+            train_loader = to_torch_dataloader(x_train, y_train,
+                                               batch_size=INFERENCE_BATCH_SIZE,
+                                               shuffle=False, pin_memory=True)
 
-        train_loader_balanced = to_torch_dataloader(x_train, y_train,
-                                                    batch_size=TRAINING_BATCH_SIZE,
-                                                    sampler=sampler,
-                                                    shuffle=False, pin_memory=True)
+            train_loader_balanced = to_torch_dataloader(x_train, y_train,
+                                                        batch_size=TRAINING_BATCH_SIZE,
+                                                        sampler=sampler,
+                                                        shuffle=False, pin_memory=True)
 
-        screen_loader = to_torch_dataloader(x_screen, y_screen,
-                                            batch_size=INFERENCE_BATCH_SIZE,
-                                            shuffle=False, pin_memory=True)
+            screen_loader = to_torch_dataloader(x_screen, y_screen,
+                                                batch_size=INFERENCE_BATCH_SIZE,
+                                                shuffle=False, pin_memory=True)
 
-        # Initiate and train the model (optimize if specified)
-        print("Training model")
-        if retrain or cycle == 0:
-            M = Ensemble(seed=seed, ensemble_size=ensemble_size, architecture=architecture, anchored=anchored)
-            if cycle == 0 and optimize_hyperparameters:
-                M.optimize_hyperparameters(x_train, y_train)
-            M.train(train_loader_balanced, verbose=False)
+            # Initiate and train the model (optimize if specified)
+            print("Training model")
+            if retrain or cycle == 0:
+                M = Ensemble(seed=seed, ensemble_size=ensemble_size, architecture=architecture, anchored=anchored)
+                if cycle == 0 and optimize_hyperparameters:
+                    M.optimize_hyperparameters(x_train, y_train)
+                M.train(train_loader_balanced, verbose=False)
 
-        # Do inference of the train/test/screen data
-        print("Train/test/screen inference")
-        train_logits_N_K_C = M.predict(train_loader)
-        eval_train.eval(train_logits_N_K_C, y_train)
+            # Do inference of the train/test/screen data
+            print("Train/test/screen inference")
+            train_logits_N_K_C = M.predict(train_loader)
+            eval_train.eval(train_logits_N_K_C, y_train)
 
-        test_logits_N_K_C = M.predict(test_loader)
-        eval_test.eval(test_logits_N_K_C, y_test)
+            test_logits_N_K_C = M.predict(test_loader)
+            eval_test.eval(test_logits_N_K_C, y_test)
 
-        screen_logits_N_K_C = M.predict(screen_loader)
-        eval_screen.eval(screen_logits_N_K_C, y_screen)
+            screen_logits_N_K_C = M.predict(screen_loader)
+            eval_screen.eval(screen_logits_N_K_C, y_screen)
+        else:
+            print("Training model")
+            if retrain or cycle == 0:
+                M = RfEnsemble(seed=seed, ensemble_size=ensemble_size)
+                # if cycle == 0 and optimize_hyperparameters:
+                #     M.optimize_hyperparameters(x_train, y_train)
+                M.train(x_train, y_train, verbose=False)
+
+            # Do inference of the train/test/screen data
+            print("Train/test/screen inference")
+            train_logits_N_K_C = M.predict(x_train)
+            eval_train.eval(train_logits_N_K_C, y_train)
+
+            test_logits_N_K_C = M.predict(x_test)
+            eval_test.eval(test_logits_N_K_C, y_test)
+
+            screen_logits_N_K_C = M.predict(x_screen)
+            eval_screen.eval(screen_logits_N_K_C, y_screen)
 
         # If this is the second to last cycle, update the batch size, so we end at max_screen_size
         if len(train_idx) + batch_size > max_screen_size:
