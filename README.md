@@ -3,7 +3,7 @@
 ![python version](https://img.shields.io/badge/python-3.9_|_3.10_|_3.11-blue)
 ![license](https://img.shields.io/badge/license-MIT-orange)
 [![Static Badge](https://img.shields.io/badge/ChemRxiv-10.26434/chemrxiv--2023--wgl32--v3-8A2BE2)](https://chemrxiv.org/engage/chemrxiv/article-details/65d8833ce9ebbb4db9098cb5)
-[![Static Badge](https://img.shields.io/badge/Zenodo-10.5281/zenodo.10781477-54af7d)](https://10.0.20.161/zenodo.10781477)
+[![Static Badge](https://img.shields.io/badge/Zenodo-10.5281/zenodo.10781477-54af7d)](https:///zenodo.org/records/10781477)
 
 
 <h1 id="benchmark-study">Traversing Chemical Space with Active Deep Learning: A Computational Framework for Low-data Drug Discovery</h1>
@@ -68,11 +68,11 @@ pip3 install scikit-learn==1.3.0 rdkit==2023.3.2 pandas tqdm argparse h5py
 
 ### Data 
 
-Before running the active learning pipeline on the same data used in the paper, the original data from LITPCBA (https://drugdesign.unistra.fr/LIT-PCBA/) needs to be processed.
+Before running the active learning pipeline on the same data used in the paper, the original data from [LITPCBA](https://drugdesign.unistra.fr/LIT-PCBA/) needs to be processed.
 
 1. run `python active_learning/preprocess_data.py` to process and cluster all data. This takes around an hour on a regular computer. Clustering requires >128GB of RAM.
 
-Alternatively, pre-processed data (~40GB) can be found here: https://10.0.20.161/zenodo.10781477
+Alternatively, pre-processed data (~40GB) can be found [here](https://zenodo.org/records/10781477)
 
 ### Running the pipeline
 2. Run `python main.py` with desired command-line arguments to start the active learning process. Ensure necessary data files are present.
