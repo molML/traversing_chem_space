@@ -34,28 +34,32 @@ if __name__ == '__main__':
 
 
     for i, experiment in tqdm(enumerate(experiments)):
-        for seed in range(10):
-            LOG_FILE = f"results/{i}_startset_{experiment['architecture']}_{experiment['acquisition']}_{experiment['bias']}_{experiment['n_start']}_{experiment['retrain']}_{experiment['dataset']}_simulation_results.csv"
+        LOG_FILE = f"results/{i}_startset_{experiment['architecture']}_{experiment['acquisition']}_{experiment['bias']}_{experiment['n_start']}_{experiment['retrain']}_{experiment['dataset']}_simulation_results.csv"
 
-            results = active_learning(n_start=experiment['n_start'],
-                                      bias=experiment['bias'],
-                                      acquisition_method=experiment['acquisition'],
-                                      max_screen_size=experiment['max_screen_size'],
-                                      batch_size=experiment['batch_size'],
-                                      architecture=experiment['architecture'],
-                                      seed=seed,
-                                      retrain=experiment['retrain'],
-                                      dataset=experiment['dataset'],
-                                      optimize_hyperparameters=False)
+        if os.path.exists(LOG_FILE):
+            print(f"Experiment {i} already exists")
+        else:
+            for seed in range(10):
 
-            # Add the experimental settings to the outfile
-            results['acquisition_method'] = experiment['acquisition']
-            results['architecture'] = experiment['architecture']
-            results['n_start'] = experiment['n_start']
-            results['batch_size'] = experiment['batch_size']
-            results['seed'] = seed
-            results['bias'] = experiment['bias']
-            results['retrain'] = experiment['retrain']
-            results['dataset'] = experiment['dataset']
+                results = active_learning(n_start=experiment['n_start'],
+                                          bias=experiment['bias'],
+                                          acquisition_method=experiment['acquisition'],
+                                          max_screen_size=experiment['max_screen_size'],
+                                          batch_size=experiment['batch_size'],
+                                          architecture=experiment['architecture'],
+                                          seed=seed,
+                                          retrain=experiment['retrain'],
+                                          dataset=experiment['dataset'],
+                                          optimize_hyperparameters=False)
 
-            results.to_csv(LOG_FILE, mode='a', index=False, header=False if os.path.isfile(LOG_FILE) else True)
+                # Add the experimental settings to the outfile
+                results['acquisition_method'] = experiment['acquisition']
+                results['architecture'] = experiment['architecture']
+                results['n_start'] = experiment['n_start']
+                results['batch_size'] = experiment['batch_size']
+                results['seed'] = seed
+                results['bias'] = experiment['bias']
+                results['retrain'] = experiment['retrain']
+                results['dataset'] = experiment['dataset']
+
+                results.to_csv(LOG_FILE, mode='a', index=False, header=False if os.path.isfile(LOG_FILE) else True)
