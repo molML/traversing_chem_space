@@ -385,8 +385,11 @@ class Evaluate:
         self.balanced_accuracy.append(balanced_acc)
 
         # calc roc-auc
-        roc_auc = roc_auc_score(y, y_hat)
-        self.roc_auc.append(roc_auc)
+        try:
+            roc_auc = roc_auc_score(y, y_hat)
+            self.roc_auc.append(roc_auc)
+        except:
+            self.roc_auc.append(0)
 
         # calc_precision
         try:
