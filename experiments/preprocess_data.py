@@ -17,7 +17,7 @@ if __name__ == '__main__':
     for dataset in ['ALDH1', 'PKM2', 'VDR']:
 
         df = get_data(dataset=dataset)
-        df_screen, df_test = split_data(df, screen_size=1000, test_size=200, dataset=dataset)
+        df_screen, df_test = split_data(df, screen_size=100000, test_size=20000, dataset=dataset)
 
         MasterDataset(name='screen', df=df_screen, overwrite=True, dataset=dataset)
         MasterDataset(name='test', df=df_test, overwrite=True, dataset=dataset)
@@ -97,3 +97,15 @@ if __name__ == '__main__':
         print(len(cluster_smiles_with_hits))
 
         torch.save(cluster_smiles_with_hits, f'data/{dataset}/screen/starting_clusters')
+
+    # Process three other datasets with very few actives as an extra case-study
+    for dataset in ['IDH1', 'ADRB2', 'OPRK1']:
+
+        df = get_data(dataset=dataset)
+        df_screen, df_test = split_data(df, screen_size=100000, test_size=20000, dataset=dataset)
+
+        MasterDataset(name='screen', df=df_screen, overwrite=True, dataset=dataset)
+        MasterDataset(name='test', df=df_test, overwrite=True, dataset=dataset)
+
+        df_screen = pd.read_csv(os.path.join(ROOT_DIR, f'data/{dataset}/original/screen.csv'))
+        df_test = pd.read_csv(os.path.join(ROOT_DIR, f'data/{dataset}/original/test.csv'))
