@@ -5,6 +5,7 @@ import argparse
 from tqdm.auto import tqdm
 from active_learning.screening import active_learning
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.append('../active_learning')
 
 
 if __name__ == '__main__':
