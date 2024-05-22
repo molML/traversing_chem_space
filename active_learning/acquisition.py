@@ -10,8 +10,7 @@ Here N is a molecule, K are the number of sampled predictions (i.e., 10 for a 10
 
 import numpy as np
 import torch
-from torch import Tensor, tensor
-from batchbald_redux.batchbald import get_batchbald_batch
+from torch import Tensor
 from rdkit.Chem.AllChem import GetMorganFingerprintAsBitVect as ECFPbitVec
 from rdkit.DataStructs import BulkTanimotoSimilarity
 from rdkit import Chem
@@ -27,7 +26,6 @@ class Acquisition:
                                    'dynamic': dynamic_exploration,
                                    'dynamicbald': dynamic_exploration_bald,
                                    'bald': bald,
-                                   'batch_bald': batch_bald,
                                    'similarity': similarity_search}
 
         assert method in self.acquisition_method.keys(), f"Specified 'method' not available. " \
@@ -166,19 +164,6 @@ def bald(logits_N_K_C: Tensor, smiles: np.ndarray[str], n: int = 1, **kwargs) ->
     picks_idx = torch.argsort(I, descending=False)[:n]
 
     return smiles[picks_idx.cpu()]
-
-
-def batch_bald(logits_N_K_C: Tensor, smiles: np.ndarray[str], n: int = 1, num_samples: int = 1000, **kwargs) -> \
-        np.ndarray[str]:
-    """ Get BatchBALD batch - Kirch et al., 2019, NeurIPS"""
-    if n == 1:
-        return bald(logits_N_K_C, smiles)
-
-    num_samples = logits_N_K_C.shape[0] if num_samples is None else num_samples
-    candidate_batch = get_batchbald_batch(logits_N_K_C, batch_size=n, num_samples=num_samples,
-                                          device=torch.device("cuda" if torch.cuda.is_available() else "cpu"))
-
-    return smiles[candidate_batch.indices]
 
 
 def similarity_search(hits: np.ndarray[str], smiles: np.ndarray[str], n: int = 1, radius: int = 2, nBits: int = 1024,

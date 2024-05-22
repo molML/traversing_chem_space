@@ -15,8 +15,7 @@ PARAMETERS = {'max_screen_size': [1000],
               'dataset': ['ALDH1', 'PKM2', 'VDR'],
               'seed': list(range(10)),
               'bias': ['random', 'small', 'large'],
-              'acquisition': ['random', 'exploration', 'exploitation', 'dynamic', 'dynamicbald', 'batch_bald',
-                              'similarity', 'bald']
+              'acquisition': ['random', 'exploration', 'exploitation', 'dynamic', 'dynamicbald', 'similarity', 'bald']
               }
 
 
@@ -25,7 +24,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-o', help='The path of the output directory', default='results')
     parser.add_argument('-acq', help="Acquisition function ('random', 'exploration', 'exploitation', 'dynamic', "
-                                     "'batch_bald', 'similarity')", default='random')
+                                     "'similarity')", default='random')
     parser.add_argument('-bias', help='The level of bias ("random", "small", "large")', default='results')
     parser.add_argument('-arch', help='The neural network architecture ("gcn", "mlp")', default='mlp')
     parser.add_argument('-dataset', help='The dataset ("ALDH1", "PKM2", "VDR")', default='ALDH1')
