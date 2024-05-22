@@ -402,7 +402,7 @@ class RfEnsemble():
         y_hats = []
         for m in self.models.values():
 
-            y_hat = torch.tensor(np.log(m.predict_proba(x) + eps))
+            y_hat = torch.tensor(m.predict_proba(x) + eps)
             if y_hat.shape[1] == 1:  # if only one class if predicted with the RF model, add a column of zeros
                 y_hat = torch.cat((y_hat, torch.zeros((y_hat.shape[0], 1))), dim=1)
             y_hats.append(y_hat)
