@@ -99,7 +99,7 @@ if __name__ == '__main__':
         torch.save(cluster_smiles_with_hits, f'data/{dataset}/screen/starting_clusters')
 
     # Process three other datasets with very few actives as an extra case-study
-    for dataset in ['IDH1', 'ADRB2', 'OPRK1']:
+    for dataset in ['IDH1', 'ADRB2', 'OPRK1', 'GBA', 'KAT2A', 'FEN1']:
 
         df = get_data(dataset=dataset)
         df_screen, df_test = split_data(df, screen_size=100000, test_size=20000, dataset=dataset)

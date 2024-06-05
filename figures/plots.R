@@ -93,11 +93,43 @@ acq_cols = list(custom_colours, acq_funcs)
 
 df2 = subset(df, train_cycle >= 0 & batch_size == 64 & bias == 'Innate' & n_start == 64)
 
+df2_stats = subset(df2, total_mols_screened == 1000)
+statistics = list()
+for (dataset_ in c("PKM2" ,"ALDH1", "VDR")){
+  for (algo in c('mlp', 'gcn')){
+    for (acq1 in acq_funcs){
+      statistics[['datasets']] = c(statistics[['datasets']] , dataset_)
+      statistics[['algos']] = c(statistics[['algos']] , algo)
+      statistics[['acqs']] = c(statistics[['acqs']] , acq1)
+      
+      for (acq2 in acq_funcs){
+        p = wilcox.test(subset(df2_stats, dataset == dataset_ & architecture == algo & acquisition_method == acq1)$enrichment,
+                             subset(df2_stats, dataset == dataset_ & architecture == algo & acquisition_method == acq2)$enrichment,
+                        paired=T)$p.value
+        if (is.na(p)){
+          p=1
+        }
+        if (p < 0.05){
+          statistics[[acq2]] = c(statistics[[acq2]], '*')
+        } else {
+          statistics[[acq2]] = c(statistics[[acq2]], '')
+        }
+      }
+    }
+  }
+}
+statistics = data.frame(statistics)
+
+
+
+
 df2 = df2 %>%
   group_by(acquisition_method, bias, dataset, total_mols_screened, train_cycle, architecture) %>%
   summarise(across(c("hits_discovered", "test_tpr", 'test_roc_auc', 
                      'test_balanced_accuracy', 'enrichment'), 
                    list(mean = mean, sd = sd, se = se))) %>% ungroup()
+
+
 
 fig2a = ggplot(subset(df2, dataset == 'PKM2' & architecture == 'mlp'), aes(x = total_mols_screened, y=enrichment_mean, color=acquisition_method, fill=acquisition_method, linetype=architecture))+
   geom_ribbon(aes(ymin = enrichment_mean - enrichment_se, ymax = enrichment_mean + enrichment_se),
@@ -232,6 +264,40 @@ margins_f = unit(c(0.25, 0.25, 0, 0.25), "cm")
 margins_g = unit(c(0.25, 0.25, 0.25, 0.25), "cm")
 margins_h = unit(c(0.25, 0.25, 0.25, 0.25), "cm")
 
+
+# Statistics
+dfxc_stats = subset(dfx, total_mols_screened==1000)
+dfx_stats = list()
+for (acq in acq_funcs){
+  dfx_stats[['subplot']] = c(dfx_stats[['subplot']], 'f')
+  dfx_stats[['acq']] = c(dfx_stats[['acq']], acq)
+
+  p_rand = wilcox.test(subset(dfxc_stats, acquisition_method == acq)$unique_patterns,
+              subset(dfxc_stats, acquisition_method == 'Random')$unique_patterns,
+              paired=T)$p.value
+  if (is.na(p_rand)){
+    p_rand = 1
+  }
+  if (p_rand < 0.05){
+    dfx_stats[['wilx_rand']] = c(dfx_stats[['wilx_rand']], '*')
+  } else {
+    dfx_stats[['wilx_rand']] = c(dfx_stats[['wilx_rand']], '')
+  }
+  
+  p_sim = wilcox.test(subset(dfxc_stats, acquisition_method == acq)$unique_patterns,
+                       subset(dfxc_stats, acquisition_method == 'Similarity')$unique_patterns,
+                       paired=T)$p.value
+  if (is.na(p_sim)){
+    p_sim = 1
+  }
+  if (p_sim < 0.05){
+    dfx_stats[['wilx_sim']] = c(dfx_stats[['wilx_sim']], '*')
+  } else {
+    dfx_stats[['wilx_sim']] = c(dfx_stats[['wilx_sim']], '')
+  }
+}
+
+
 ## c ##
 dfxc = dfx %>%
   group_by(acquisition_method, total_mols_screened) %>%
@@ -292,6 +358,39 @@ for (x in zip(dfx$total_mols_screened, dfx['Aldehyde'][[1]])){
 }
 dfx$pattern_enrichment_aldehyde = pattern_enrichment_aldehyde
 
+
+# statistics
+dfxc_stats$pattern_enrichment_aldehyde = subset(dfx, total_mols_screened == 1000)$pattern_enrichment_aldehyde
+for (acq in acq_funcs){
+  dfx_stats[['subplot']] = c(dfx_stats[['subplot']], 'h')
+  dfx_stats[['acq']] = c(dfx_stats[['acq']], acq)
+  
+  p_rand = wilcox.test(subset(dfxc_stats, acquisition_method == acq)$pattern_enrichment_aldehyde,
+                       subset(dfxc_stats, acquisition_method == 'Random')$pattern_enrichment_aldehyde,
+                       paired=T)$p.value
+  if (is.na(p_rand)){
+    p_rand = 1
+  }
+  if (p_rand < 0.05){
+    dfx_stats[['wilx_rand']] = c(dfx_stats[['wilx_rand']], '*')
+  } else {
+    dfx_stats[['wilx_rand']] = c(dfx_stats[['wilx_rand']], '')
+  }
+  
+  p_sim = wilcox.test(subset(dfxc_stats, acquisition_method == acq)$pattern_enrichment_aldehyde,
+                      subset(dfxc_stats, acquisition_method == 'Similarity')$pattern_enrichment_aldehyde,
+                      paired=T)$p.value
+  if (is.na(p_sim)){
+    p_sim = 1
+  }
+  if (p_sim < 0.05){
+    dfx_stats[['wilx_sim']] = c(dfx_stats[['wilx_sim']], '*')
+  } else {
+    dfx_stats[['wilx_sim']] = c(dfx_stats[['wilx_sim']], '')
+  }
+}
+
+
 dfxe = dfx %>%
   group_by(acquisition_method, total_mols_screened) %>%
   summarise(across(.cols = pattern_enrichment_aldehyde, 
@@ -323,6 +422,39 @@ for (x in zip(dfx$hits_discovered, dfx['hit_Aldehyde'][[1]])){
 }
 dfx$aldehyde_hit_enrichment = aldehyde_hit_enrichment
 
+
+# statistics
+dfxc_stats$aldehyde_hit_enrichment = subset(dfx, total_mols_screened == 1000)$aldehyde_hit_enrichment
+for (acq in acq_funcs){
+  dfx_stats[['subplot']] = c(dfx_stats[['subplot']], 'i')
+  dfx_stats[['acq']] = c(dfx_stats[['acq']], acq)
+  
+  p_rand = wilcox.test(subset(dfxc_stats, acquisition_method == acq)$aldehyde_hit_enrichment,
+                       subset(dfxc_stats, acquisition_method == 'Random')$aldehyde_hit_enrichment,
+                       paired=T)$p.value
+  if (is.na(p_rand)){
+    p_rand = 1
+  }
+  if (p_rand < 0.05){
+    dfx_stats[['wilx_rand']] = c(dfx_stats[['wilx_rand']], '*')
+  } else {
+    dfx_stats[['wilx_rand']] = c(dfx_stats[['wilx_rand']], '')
+  }
+  
+  p_sim = wilcox.test(subset(dfxc_stats, acquisition_method == acq)$aldehyde_hit_enrichment,
+                      subset(dfxc_stats, acquisition_method == 'Similarity')$aldehyde_hit_enrichment,
+                      paired=T)$p.value
+  if (is.na(p_sim)){
+    p_sim = 1
+  }
+  if (p_sim < 0.05){
+    dfx_stats[['wilx_sim']] = c(dfx_stats[['wilx_sim']], '*')
+  } else {
+    dfx_stats[['wilx_sim']] = c(dfx_stats[['wilx_sim']], '')
+  }
+}
+
+
 dfxf = dfx %>%
   group_by(acquisition_method, total_mols_screened) %>%
   summarise(across(.cols = aldehyde_hit_enrichment, 
@@ -350,6 +482,40 @@ for (x in zip(dfx$total_mols_screened, dfx['Sulfonamide'][[1]])){
   pattern_enrichment_sulfonamide = c(pattern_enrichment_sulfonamide, enrichment)
 }
 dfx$pattern_enrichment_sulfonamide = pattern_enrichment_sulfonamide
+
+
+# statistics
+dfxc_stats$pattern_enrichment_sulfonamide = subset(dfx, total_mols_screened == 1000)$pattern_enrichment_sulfonamide
+for (acq in acq_funcs){
+  dfx_stats[['subplot']] = c(dfx_stats[['subplot']], 'j')
+  dfx_stats[['acq']] = c(dfx_stats[['acq']], acq)
+  
+  p_rand = wilcox.test(subset(dfxc_stats, acquisition_method == acq)$pattern_enrichment_sulfonamide,
+                       subset(dfxc_stats, acquisition_method == 'Random')$pattern_enrichment_sulfonamide,
+                       paired=T)$p.value
+  if (is.na(p_rand)){
+    p_rand = 1
+  }
+  if (p_rand < 0.05){
+    dfx_stats[['wilx_rand']] = c(dfx_stats[['wilx_rand']], '*')
+  } else {
+    dfx_stats[['wilx_rand']] = c(dfx_stats[['wilx_rand']], '')
+  }
+  
+  p_sim = wilcox.test(subset(dfxc_stats, acquisition_method == acq)$pattern_enrichment_sulfonamide,
+                      subset(dfxc_stats, acquisition_method == 'Similarity')$pattern_enrichment_sulfonamide,
+                      paired=T)$p.value
+  if (is.na(p_sim)){
+    p_sim = 1
+  }
+  if (p_sim < 0.05){
+    dfx_stats[['wilx_sim']] = c(dfx_stats[['wilx_sim']], '*')
+  } else {
+    dfx_stats[['wilx_sim']] = c(dfx_stats[['wilx_sim']], '')
+  }
+}
+
+
 
 dfxg = dfx %>%
   group_by(acquisition_method, total_mols_screened) %>%
@@ -382,6 +548,39 @@ for (x in zip(dfx$hits_discovered, dfx['hit_Sulfonamide'][[1]])){
   sulfonamide_hit_enrichment = c(sulfonamide_hit_enrichment, enrichment)
 }
 dfx$sulfonamide_hit_enrichment = sulfonamide_hit_enrichment
+
+
+# statistics
+dfxc_stats$sulfonamide_hit_enrichment = subset(dfx, total_mols_screened == 1000)$sulfonamide_hit_enrichment
+for (acq in acq_funcs){
+  dfx_stats[['subplot']] = c(dfx_stats[['subplot']], 'k')
+  dfx_stats[['acq']] = c(dfx_stats[['acq']], acq)
+  
+  p_rand = wilcox.test(subset(dfxc_stats, acquisition_method == acq)$sulfonamide_hit_enrichment,
+                       subset(dfxc_stats, acquisition_method == 'Random')$sulfonamide_hit_enrichment,
+                       paired=T)$p.value
+  if (is.na(p_rand)){
+    p_rand = 1
+  }
+  if (p_rand < 0.05){
+    dfx_stats[['wilx_rand']] = c(dfx_stats[['wilx_rand']], '*')
+  } else {
+    dfx_stats[['wilx_rand']] = c(dfx_stats[['wilx_rand']], '')
+  }
+  
+  p_sim = wilcox.test(subset(dfxc_stats, acquisition_method == acq)$sulfonamide_hit_enrichment,
+                      subset(dfxc_stats, acquisition_method == 'Similarity')$sulfonamide_hit_enrichment,
+                      paired=T)$p.value
+  if (is.na(p_sim)){
+    p_sim = 1
+  }
+  if (p_sim < 0.05){
+    dfx_stats[['wilx_sim']] = c(dfx_stats[['wilx_sim']], '*')
+  } else {
+    dfx_stats[['wilx_sim']] = c(dfx_stats[['wilx_sim']], '')
+  }
+}
+
 
 dfxh = dfx %>%
   group_by(acquisition_method, total_mols_screened) %>%
@@ -500,6 +699,7 @@ dev.print(pdf, 'al_v2_fig4_v2.pdf', width = 88/25.4, height = 82/25.4)
 df5 = subset(df, total_mols_screened == 1000 & batch_size == 64 & bias == 'Innate')
 df5 = subset(df5, acquisition_method %in% c("Random", "Similarity", "BALD (least mutual information)"))
 
+
 df5 = df5 %>%
   group_by(acquisition_method, n_start, dataset, total_mols_screened, train_cycle, architecture) %>%
   summarise(across(c("hits_discovered", "test_tpr", 'test_roc_auc', 
@@ -597,6 +797,36 @@ df6_bald = df6_bald[order(df6_bald$id),]
 
 # difference in enrichment
 df6_sim$enrichment = df6_bald$enrichment - df6_sim$enrichment 
+
+# Statistical tests between 64 and the other start 
+df6_stats = subset(df6_sim, train_cycle == 15)
+statistics6 = list()
+for (dataset_ in c("PKM2" ,"ALDH1", "VDR")){
+  for (algo in c('mlp', 'gcn')){
+    statistics6[['datasets']] = c(statistics6[['datasets']] , dataset_)
+    statistics6[['algos']] = c(statistics6[['algos']] , algo)
+    # break
+    # statistics6[['start_size']] = c(statistics6[['acqs']] , 64)
+    for (start_size in c(2, 4, 8, 16, 32, 64)){
+        statistics6[['start_size']] = c(statistics6[['start_size']] , start_size)
+        p = wilcox.test(subset(df6_stats, dataset == dataset_ & architecture == algo & n_start == start_size)$enrichment,
+                        subset(df6_stats, dataset == dataset_ & architecture == algo & n_start == 64)$enrichment,
+                        paired=T)$p.value
+        if (is.na(p)){
+          p=1
+        }
+        if (p < 0.05){
+          statistics6[[paste0('n_start_', start_size)]] = c(statistics6[[paste0('n_start_', start_size)]], '*')
+        } else {
+          statistics6[[paste0('n_start_', start_size)]] = c(statistics6[[paste0('n_start_', start_size)]], '')
+        }
+    }
+  }
+}
+statistics6 = data.frame(statistics6)
+
+
+
 
 
 df6 = df6_sim %>%
@@ -1315,3 +1545,4 @@ dev.print(pdf, 'al_Sup_fig5.pdf', width = 44/25.4, height = 44/25.4)
 #                  labels = c('a', 'b', 'c', 'd', 'e', 'f'), 
 #                  ncol=2, label_size=8)
 # fig5
+
