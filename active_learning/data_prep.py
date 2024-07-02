@@ -11,8 +11,8 @@ from tqdm import tqdm
 import torch
 import h5py
 from config import ROOT_DIR
-from active_learning.utils import molecular_graph_featurizer as smiles_to_graph
-from active_learning.utils import smiles_to_ecfp, get_tanimoto_matrix, check_featurizability
+from active_learning.utils import molecular_graph_featurizer as smiles_to_graph, scramble_features, smiles_to_ecfp, \
+    get_tanimoto_matrix, check_featurizability, scramble_graphs
 
 
 def canonicalize(smiles: str, sanitize: bool = True):
@@ -80,7 +80,7 @@ def split_data(df: pd.DataFrame, random_state: int = 42, screen_size: int = 5000
 class MasterDataset:
     """ Dataset that holds all data in an indexable way """
     def __init__(self, name: str, df: pd.DataFrame = None, dataset: str = 'ALDH1', representation: str = 'ecfp', root: str = 'data',
-                 overwrite: bool = False) -> None:
+                 overwrite: bool = False, scramble_x: bool = False, scramble_x_seed: int = 1) -> None:
 
         assert representation in ['ecfp', 'graph'], f"'representation' must be 'ecfp' or 'graph', not {representation}"
         self.representation = representation
@@ -94,6 +94,12 @@ class MasterDataset:
             self.smiles_index, self.index_smiles, self.smiles, self.x, self.y, self.graphs = self.load()
         else:
             self.smiles_index, self.index_smiles, self.smiles, self.x, self.y, self.graphs = self.load()
+
+        if scramble_x:
+            if representation == 'ecfp':
+                self.x = scramble_features(self.x, seed=scramble_x_seed)
+            if representation == 'graph':
+                self.graphs = scramble_graphs(self.graphs, seed=scramble_x_seed)
 
     def process(self, df: pd.DataFrame) -> None:
 

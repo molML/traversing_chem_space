@@ -552,3 +552,33 @@ def to_torch_dataloader(x: Union[list, np.ndarray], y: Optional[np.ndarray] = No
     else:
         return pyg_DataLoader(x, **kwargs)
 
+
+def scramble_features(x: np.ndarray, seed: int = 1) -> np.ndarray:
+    """ shuffle an array across the whole array (every number can end up anywhere)
+
+    :param x: numpy array
+    :param seed: random seed
+    :return: shuffled array
+    """
+
+    rng = np.random.default_rng(seed=seed)
+
+    # Flatten the array, shuffle, and reshape it back
+    flat_x = x.flatten()
+    rng.shuffle(flat_x)
+    x = flat_x.reshape(x.shape)
+
+    return x
+
+
+def scramble_graphs(graphs, seed=1):
+
+    def scramble_single_graph(g, seed):
+        g.x = torch.tensor(scramble_features(np.array(g.x), seed=seed))
+        g.edge_index = torch.tensor(scramble_features(np.array(g.edge_index), seed=seed))
+
+        return g
+
+    graphs = [scramble_single_graph(g, seed=seed) for g in graphs]
+
+    return graphs

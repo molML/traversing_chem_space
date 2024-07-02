@@ -32,6 +32,8 @@ if __name__ == '__main__':
     parser.add_argument('-batch_size', help='How many molecules we select each cycle', default=64)
     parser.add_argument('-n_start', help='How many molecules we have in our starting set (min=2)', default=64)
     parser.add_argument('-anchored', help='Anchor the weights', default='True')
+    parser.add_argument('-scrambledx', help='Scramble the features', default='False')
+    parser.add_argument('-scrambledx_seed', help='Seed for scrambling the features', default=1)
     args = parser.parse_args()
 
     PARAMETERS['acquisition'] = [args.acq]
@@ -41,7 +43,10 @@ if __name__ == '__main__':
     PARAMETERS['architecture'] = [args.arch]
     PARAMETERS['batch_size'] = [int(args.batch_size)]
     PARAMETERS['n_start'] = [int(args.n_start)]
+    PARAMETERS['n_start'] = [int(args.n_start)]
     PARAMETERS['anchored'] = [eval(args.anchored)]
+    PARAMETERS['scrambledx'] = [eval(args.scrambledx)]
+    PARAMETERS['scrambledx_seed'] = [int(args.scrambledx_seed)]
     # LOG_FILE = f'{args.o}/{args.arch}_{args.acq}_{args.bias}_{args.batch_size}_simulation_results.csv'
     LOG_FILE = args.o
 
@@ -64,6 +69,8 @@ if __name__ == '__main__':
                                   retrain=experiment['retrain'],
                                   anchored=experiment['anchored'],
                                   dataset=experiment['dataset'],
+                                  scrambledx=experiment['scrambledx'],
+                                  scrambledx_seed=experiment['scrambledx_seed'],
                                   optimize_hyperparameters=False)
 
         # Add the experimental settings to the outfile
@@ -74,6 +81,8 @@ if __name__ == '__main__':
         results['seed'] = experiment['seed']
         results['bias'] = experiment['bias']
         results['retrain'] = experiment['retrain']
+        results['scrambledx'] = experiment['scrambledx']
+        results['scrambledx_seed'] = experiment['scrambledx_seed']
         results['dataset'] = experiment['dataset']
 
         results.to_csv(LOG_FILE, mode='a', index=False, header=False if os.path.isfile(LOG_FILE) else True)

@@ -26,7 +26,8 @@ TRAINING_BATCH_SIZE = 64
 def active_learning(n_start: int = 64, acquisition_method: str = 'exploration', max_screen_size: int = None,
                     batch_size: int = 16, architecture: str = 'gcn', seed: int = 0, bias: str = 'random',
                     optimize_hyperparameters: bool = False, ensemble_size: int = 10, retrain: bool = True,
-                    anchored: bool = True, dataset: str = 'ALDH1') -> pd.DataFrame:
+                    anchored: bool = True, dataset: str = 'ALDH1', scrambledx: bool = False,
+                    scrambledx_seed: int = 1) -> pd.DataFrame:
     """
     :param n_start: number of molecules to start out with
     :param acquisition_method: acquisition method, as defined in active_learning.acquisition
@@ -37,12 +38,15 @@ def active_learning(n_start: int = 64, acquisition_method: str = 'exploration', 
     :param bias: 'random', 'small', 'large'
     :param optimize_hyperparameters: Bool
     :param ensemble_size: number of models in the ensemble, default is 10
+    :param scrambledx: toggles randomizing the features
+    :param scrambledx_seed: seed for scrambling the features
     :return: dataframe with results
     """
 
     # Load the datasets
     representation = 'ecfp' if architecture in ['mlp', 'rf'] else 'graph'
-    ds_screen = MasterDataset('screen', representation=representation, dataset=dataset)
+    ds_screen = MasterDataset('screen', representation=representation, dataset=dataset, scramble_x=scrambledx,
+                              scramble_x_seed=scrambledx_seed)
     ds_test = MasterDataset('test', representation=representation, dataset=dataset)
 
     # Initiate evaluation trackers
