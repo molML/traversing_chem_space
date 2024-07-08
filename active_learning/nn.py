@@ -409,6 +409,8 @@ class RfEnsemble():
 
         logits_N_K_C = torch.stack(y_hats, 1)
 
+        logits_N_K_C = torch.log(logits_N_K_C)
+
         return logits_N_K_C
 
     def __getitem__(self, item):
