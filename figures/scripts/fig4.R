@@ -13,6 +13,8 @@ fig4a = ggplot(data=df4_umap, aes(x=UMAP1, y=UMAP2, color=exploitation))+
   scale_color_manual(values=umap_cols) +
   default_plot_theme
 
+table(df4_umap$exploitation_alpha)
+
 df4_umap = df4_umap[order(df4_umap$exploitation_static, decreasing=F),]
 df4_umap$exploitation_static = factor(df4_umap$exploitation_static)
 df4_umap$exploitation_static_alpha = as.numeric(df4_umap$exploitation_static )
@@ -28,6 +30,7 @@ df4_umap$similarity = factor(df4_umap$similarity)
 df4_umap$similarity_alpha = as.numeric(df4_umap$similarity )
 df4_umap$similarity_alpha[df4_umap$similarity_alpha == 1] = 0.05
 fig4c = ggplot(data=df4_umap, aes(x=UMAP1, y=UMAP2, color=similarity))+
+  geom_point(size=0.75, shape=16, alpha=df4_umap$similarity_alpha) +
   labs(title='similarity')+
   scale_color_manual(values=umap_cols) +
   default_plot_theme
@@ -37,7 +40,7 @@ fig4abc = plot_grid(fig4a, fig4b, fig4c,
                     labels = c('a', 'b', 'c'),
                     ncol=3, label_size=8)
 
-pdf('figures/fig4_umaps.pdf', width = 180/25.4, height = 60/25.4)
+pdf('figures/fig4_umaps_.pdf', width = 180/25.4, height = 60/25.4)
 print(fig4abc)
 dev.off()
 

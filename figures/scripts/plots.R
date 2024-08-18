@@ -50,7 +50,7 @@ custom_colours = c('#653f88', '#926db4', '#c3a3e0',
 
 custom_colours = c("#5c8095", "#60ae9e", "#85b8d6", "#c28a5e", "#bbbbbb", "#efc57b")
 
-umap_cols = c("#bbbbbb", "#5c8095", "#dccd7e")
+umap_cols = c("#dddddd", "#5c8095", "#efc57b")
 bias_colours = c("#5c8095", "#efc57b", "#c28a5e")
 # col_gradient = c("#3d7368", "#5c8095", "#85b8d6", "#bbbbbb", "#efc57b", "#c28a5e")
 
