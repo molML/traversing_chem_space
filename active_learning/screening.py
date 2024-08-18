@@ -6,17 +6,17 @@ This script contains the main active learning loop that runs all experiments.
 
 """
 
+from math import ceil
 import pandas as pd
 import numpy as np
+from tqdm.auto import tqdm
+import torch
+from torch.utils.data import WeightedRandomSampler
 from active_learning.nn import Ensemble, RfEnsemble
 from active_learning.data_prep import MasterDataset
 from active_learning.data_handler import Handler
 from active_learning.utils import Evaluate, to_torch_dataloader
 from active_learning.acquisition import Acquisition, logits_to_pred
-from tqdm.auto import tqdm
-import torch
-from torch.utils.data import WeightedRandomSampler
-from math import ceil
 
 
 INFERENCE_BATCH_SIZE = 512

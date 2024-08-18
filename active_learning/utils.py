@@ -1,16 +1,16 @@
 
-from torch_geometric.data import Data
-from rdkit import Chem
-from tqdm import tqdm
-from sklearn.metrics import balanced_accuracy_score, roc_auc_score, precision_score, recall_score, confusion_matrix
-import numpy as np
-import pandas as pd
-import torch
-from rdkit.Chem import AllChem, DataStructs
 from typing import Union, Optional
-from torch_geometric.loader import DataLoader as pyg_DataLoader
+import pandas as pd
+import numpy as np
+from tqdm import tqdm
+from rdkit import Chem
+from rdkit.Chem import AllChem, DataStructs
+import torch
 from torch import Tensor
 from torch.utils.data import TensorDataset, DataLoader
+from torch_geometric.data import Data
+from torch_geometric.loader import DataLoader as pyg_DataLoader
+from sklearn.metrics import balanced_accuracy_score, roc_auc_score, precision_score, recall_score, confusion_matrix
 
 
 structural_smarts = {

@@ -8,15 +8,15 @@ Derek van Tilborg | 06-03-2023 | Eindhoven University of Technology
 
 """
 
+import itertools
+from operator import itemgetter
 import numpy as np
 import torch
+from tqdm.auto import tqdm
 from sklearn.metrics import balanced_accuracy_score
 from active_learning.hyperparameters import MLP_hypers, GCN_hypers
 from active_learning.utils import to_torch_dataloader
 from active_learning.acquisition import logits_to_pred
-from tqdm.auto import tqdm
-import itertools
-from operator import itemgetter
 
 
 def optimize_hyperparameters(x: np.ndarray, y: np.ndarray, class_weights=None, n_folds: int = 5,

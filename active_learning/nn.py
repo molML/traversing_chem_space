@@ -12,16 +12,16 @@ This script contains all models:
 
 """
 
+from copy import deepcopy
 import numpy as np
 import torch
 from torch import Tensor
 from torch.utils.data import DataLoader
 from torch.nn import functional as F
-from copy import deepcopy
 from torch_geometric.nn import GCNConv, global_add_pool, BatchNorm, GATConv, GINConv
 from tqdm.auto import trange
-from active_learning.hyperopt import optimize_hyperparameters
 from sklearn.ensemble import RandomForestClassifier
+from active_learning.hyperopt import optimize_hyperparameters
 
 
 class MLP(torch.nn.Module):

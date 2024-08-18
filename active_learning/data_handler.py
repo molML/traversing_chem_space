@@ -9,9 +9,9 @@ This script contains the class that manages the data over cycles
 """
 
 from typing import Union
+import os
 import numpy as np
 import torch
-import os
 from config import ROOT_DIR
 
 
