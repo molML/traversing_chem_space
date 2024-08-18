@@ -3,7 +3,8 @@
 ![python version](https://img.shields.io/badge/python-3.9_|_3.10_|_3.11-blue)
 ![license](https://img.shields.io/badge/license-MIT-orange)
 [![Static Badge](https://img.shields.io/badge/ChemRxiv-10.26434/chemrxiv--2023--wgl32--v3-8A2BE2)](https://chemrxiv.org/engage/chemrxiv/article-details/65d8833ce9ebbb4db9098cb5)
-[![Static Badge](https://img.shields.io/badge/Zenodo-10.5281/zenodo.10781476-54af7d)](https:///zenodo.org/records/10781476)
+[![Static Badge](https://img.shields.io/badge/Zenodo_(data)-10.5281/zenodo.10781476-54af7d)](https:///zenodo.org/records/10781476)
+[![Static Badge](https://img.shields.io/badge/Zenodo_(code)-10.5281/zenodo.13337647-efc57b)](https:///zenodo.org/records/13337647)
 
 
 <h1 id="benchmark-study">Traversing Chemical Space with Active Deep Learning for Low-data Drug Discovery</h1>
