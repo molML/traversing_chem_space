@@ -6,7 +6,7 @@
 [![Static Badge](https://img.shields.io/badge/Zenodo-10.5281/zenodo.10781476-54af7d)](https:///zenodo.org/records/10781476)
 
 
-<h1 id="benchmark-study">Traversing Chemical Space with Active Deep Learning: A Computational Framework for Low-data Drug Discovery</h1>
+<h1 id="benchmark-study">Traversing Chemical Space with Active Deep Learning for Low-data Drug Discovery</h1>
 
  
 ## Description
